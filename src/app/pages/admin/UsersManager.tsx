@@ -1,87 +1,133 @@
 import React, { useEffect, useState } from 'react';
 import { UsersAdminService } from '../../../services/domain/UsersAdminService';
-import type { User } from '../../../models/User';
+import type { User, UserRole } from '../../../models/User';
 import { DataTable } from './components/DataTable';
-import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
-
-const svc = new UsersAdminService();
+import { Modal } from '../../components/ui/Modal';
+import { useAdmin } from '../../../contexts/AdminContext';
 
 export const UsersManager: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [editing, setEditing] = useState<Partial<User> | null>(null);
-  const [open, setOpen] = useState(false);
-  const [password, setPassword] = useState('');
+    const { setLoading, showNotification } = useAdmin();
+    const [users, setUsers] = useState<User[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const service = new UsersAdminService();
 
-  const load = async () => setUsers(await svc.listAll());
+    // Form State
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        name: '',
+        role: 'waiter' as UserRole
+    });
 
-  useEffect(() => { load(); }, []);
+    const loadUsers = async () => {
+        setLoading(true);
+        try {
+            const data = await service.getAllUsers();
+            setUsers(data);
+        } catch (error) {
+            showNotification('error', 'Error cargando usuarios');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const save = async () => {
-    if (!editing) return;
-    if (editing.id) {
-      await svc.updateUser(editing.id, editing as User);
-    } else {
-      // create: require password
-      if (!editing.email || !password) { alert('Email y password requeridos'); return; }
-      await svc.createUser(editing.email, password, editing.name || editing.email, editing.role as any);
-    }
-    await load();
-    setOpen(false);
-    setEditing(null);
-    setPassword('');
-  };
+    useEffect(() => {
+        loadUsers();
+    }, []);
 
-  const toggleActive = async (u: User) => {
-    await svc.toggleActive(u.id, !u.isActive);
-    await load();
-  };
+    const handleCreate = async () => {
+        if (!formData.email || !formData.password || !formData.name) {
+            showNotification('error', 'Todos los campos son obligatorios');
+            return;
+        }
 
-  const resetPassword = async (u: User) => {
-    if (!u.email) return alert('Usuario sin email');
-    await svc.resetPassword(u.email);
-    alert('Email de reset enviado (si existe)');
-  };
+        setLoading(true);
+        try {
+            await service.createUser(formData);
+            showNotification('success', 'Usuario creado correctamente');
+            setIsModalOpen(false);
+            setFormData({ email: '', password: '', name: '', role: 'waiter' });
+            loadUsers();
+        } catch (error: any) {
+            showNotification('error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1>Usuarios</h1>
-        <Button onClick={() => { setEditing({}); setOpen(true); }}>+ Nuevo Usuario</Button>
-      </div>
+    const handleToggleStatus = async (user: User) => {
+        try {
+            await service.toggleUserStatus(user);
+            showNotification('success', `Usuario ${user.isActive ? 'desactivado' : 'activado'}`);
+            loadUsers();
+        } catch (error) {
+            showNotification('error', 'Error actualizando estado');
+        }
+    };
 
-      <DataTable 
-        data={users}
-        columns={[
-          { header: 'Nombre', accessor: (i: User) => i.name },
-          { header: 'Email', accessor: 'email' },
-          { header: 'Rol', accessor: 'role' },
-          { header: 'Activo', accessor: (i: User) => i.isActive ? 'Sí' : 'No' }
-        ]}
-        onEdit={(u) => { setEditing(u); setOpen(true); }}
-        onToggleActive={(u) => toggleActive(u as User)}
-      />
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <h1 style={{ margin: 0 }}>Gestión de Usuarios</h1>
+                <Button onClick={() => setIsModalOpen(true)}>+ Nuevo Usuario</Button>
+            </div>
 
-      <Modal isOpen={open} onClose={() => setOpen(false)} title={editing?.id ? 'Editar Usuario' : 'Nuevo Usuario'}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input placeholder="Nombre" value={editing?.name || ''} onChange={e => setEditing({...editing, name: e.target.value})} />
-          <input placeholder="Email" value={editing?.email || ''} onChange={e => setEditing({...editing, email: e.target.value})} />
-          <select value={editing?.role || 'cashier'} onChange={e => setEditing({...editing, role: e.target.value as any})}>
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="cashier">Cajero</option>
-            <option value="kitchen">Cocina</option>
-            <option value="waiter">Mesero</option>
-          </select>
-          {!editing?.id && (
-            <input type="password" placeholder="Contraseña inicial" value={password} onChange={e => setPassword(e.target.value)} />
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={save}>Guardar</Button>
-            {editing?.id && <Button variant="outline" onClick={() => resetPassword(editing as User)}>Reset Password</Button>}
-          </div>
+            <DataTable 
+                data={users}
+                columns={[
+                    { header: 'Nombre', accessor: 'name' },
+                    { header: 'Email', accessor: 'email' },
+                    { header: 'Rol', accessor: (u) => <span style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 'bold' }}>{u.role}</span> },
+                    { header: 'Estado', accessor: (u) => u.isActive ? 'Activo' : 'Inactivo' }
+                ]}
+                onToggleActive={handleToggleStatus}
+            />
+
+            <Modal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                title="Crear Nuevo Usuario"
+                footer={
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleCreate}>Crear Usuario</Button>
+                    </div>
+                }
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <input 
+                        className="input-field" 
+                        placeholder="Nombre Completo" 
+                        value={formData.name}
+                        onChange={e => setFormData({...formData, name: e.target.value})}
+                    />
+                    <input 
+                        className="input-field" 
+                        type="email"
+                        placeholder="Correo Electrónico" 
+                        value={formData.email}
+                        onChange={e => setFormData({...formData, email: e.target.value})}
+                    />
+                    <input 
+                        className="input-field" 
+                        type="password"
+                        placeholder="Contraseña" 
+                        value={formData.password}
+                        onChange={e => setFormData({...formData, password: e.target.value})}
+                    />
+                    <select 
+                        className="input-field"
+                        value={formData.role}
+                        onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
+                    >
+                        <option value="waiter">Mesero (Waiter)</option>
+                        <option value="cashier">Cajero (Cashier)</option>
+                        <option value="kitchen">Cocina (Kitchen)</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+            </Modal>
         </div>
-      </Modal>
-    </div>
-  );
+    );
 };

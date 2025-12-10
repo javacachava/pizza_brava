@@ -1,45 +1,122 @@
-import React, { useState } from 'react';
-import { useMenu } from '../../../hooks/useMenu';
+import React, { useState, useEffect } from 'react';
 import { CategoryRepository } from '../../../repos/CategoryRepository';
-import { DataTable } from './components/DataTable';
 import type { Category } from '../../../models/Category';
+import { DataTable } from './components/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { useAdmin } from '../../../contexts/AdminContext';
 
 export const CategoriesManager: React.FC = () => {
-    const { categories, reload } = useMenu();
+    const { setLoading, showNotification } = useAdmin();
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingCat, setEditingCat] = useState<Partial<Category>>({});
+    
     const repo = new CategoryRepository();
-    const [editing, setEditing] = useState<Partial<Category> | null>(null);
-    const [isOpen, setIsOpen] = useState(false);
+
+    const loadCategories = async () => {
+        setLoading(true);
+        try {
+            const data = await repo.getAllOrdered();
+            setCategories(data);
+        } catch (error) {
+            showNotification('error', 'Error cargando categorías');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { loadCategories(); }, []);
 
     const handleSave = async () => {
-        if (!editing || !editing.name) return;
-        if (editing.id) await repo.update(editing.id, editing);
-        else await repo.create({ ...editing, order: categories.length + 1 } as Category);
-        await reload();
-        setIsOpen(false);
+        if (!editingCat.name || !editingCat.order) {
+            showNotification('error', 'Nombre y Orden son obligatorios');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            if (editingCat.id) {
+                await repo.update(editingCat.id, editingCat);
+                showNotification('success', 'Categoría actualizada');
+            } else {
+                await repo.create({
+                    name: editingCat.name,
+                    order: editingCat.order,
+                    isActive: true
+                } as any);
+                showNotification('success', 'Categoría creada');
+            }
+            setIsModalOpen(false);
+            loadCategories();
+        } catch (error) {
+            showNotification('error', 'Error guardando categoría');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (cat: Category) => {
+        setEditingCat(cat);
+        setIsModalOpen(true);
+    };
+
+    const handleToggle = async (cat: Category) => {
+        try {
+            await repo.update(cat.id, { isActive: !cat.isActive });
+            loadCategories(); // Refrescamos para ver el cambio
+        } catch (error) {
+            showNotification('error', 'Error cambiando estado');
+        }
     };
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h1>Categorías</h1>
-                <Button onClick={() => { setEditing({}); setIsOpen(true); }}>+ Nueva</Button>
+                <h1 style={{ margin: 0 }}>Categorías</h1>
+                <Button onClick={() => { setEditingCat({ order: categories.length + 1 }); setIsModalOpen(true); }}>+ Nueva Categoría</Button>
             </div>
+
             <DataTable 
                 data={categories}
                 columns={[
-                    { header: 'Orden', accessor: 'order', width: '50px' },
+                    { header: 'Orden', accessor: 'order', width: '80px' },
                     { header: 'Nombre', accessor: 'name' },
-                    { header: 'ID Referencia', accessor: 'id' }
+                    { header: 'Estado', accessor: (c) => c.isActive ? 'Activa' : 'Inactiva' }
                 ]}
-                onEdit={(item) => { setEditing(item); setIsOpen(true); }}
+                onEdit={handleEdit}
+                onToggleActive={handleToggle}
             />
-            <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Categoría">
+
+            <Modal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                title={editingCat.id ? "Editar Categoría" : "Nueva Categoría"}
+                footer={
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSave}>Guardar</Button>
+                    </div>
+                }
+            >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <input className="input-field" placeholder="Nombre Categoría" value={editing?.name || ''} onChange={e => setEditing({...editing, name: e.target.value})} />
-                    <input className="input-field" type="number" placeholder="Orden" value={editing?.order || ''} onChange={e => setEditing({...editing, order: parseInt(e.target.value)})} />
-                    <Button onClick={handleSave}>Guardar</Button>
+                    <div>
+                        <label style={{display: 'block', fontSize: '0.9rem', marginBottom: '5px'}}>Nombre</label>
+                        <input 
+                            className="input-field" 
+                            value={editingCat.name || ''} 
+                            onChange={e => setEditingCat({...editingCat, name: e.target.value})} 
+                        />
+                    </div>
+                    <div>
+                        <label style={{display: 'block', fontSize: '0.9rem', marginBottom: '5px'}}>Orden Visual</label>
+                        <input 
+                            type="number"
+                            className="input-field" 
+                            value={editingCat.order || ''} 
+                            onChange={e => setEditingCat({...editingCat, order: parseInt(e.target.value)})} 
+                        />
+                    </div>
                 </div>
             </Modal>
         </div>

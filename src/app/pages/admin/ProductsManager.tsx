@@ -1,117 +1,166 @@
-import React, { useState } from 'react';
-import { useMenu } from '../../../hooks/useMenu';
+import React, { useState, useEffect } from 'react';
 import { MenuRepository } from '../../../repos/MenuRepository';
-import { DataTable } from './components/DataTable';
+import { CategoryRepository } from '../../../repos/CategoryRepository';
 import type { MenuItem } from '../../../models/MenuItem';
+import type { Category } from '../../../models/Category';
+import { DataTable } from './components/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { useAdmin } from '../../../contexts/AdminContext';
 
 export const ProductsManager: React.FC = () => {
-    const { categories, reload } = useMenu();
-    const repo = new MenuRepository();
-    
-    const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(null);
+    const { setLoading, showNotification } = useAdmin();
+    const [products, setProducts] = useState<MenuItem[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<Partial<MenuItem>>({});
 
-    // Aplanamos productos para la tabla
-    const allProducts = categories.flatMap(c => c.items);
+    const menuRepo = new MenuRepository();
+    const catRepo = new CategoryRepository();
 
-    const handleSave = async () => {
-        if (!editingItem || !editingItem.name || !editingItem.price) return;
-        
+    const loadData = async () => {
+        setLoading(true);
         try {
-            if (editingItem.id) {
-                await repo.update(editingItem.id, editingItem);
-            } else {
-                // Nuevo producto: valores por defecto obligatorios
-                await repo.create({
-                    ...editingItem,
-                    isAvailable: true,
-                    usesIngredients: editingItem.usesIngredients || false,
-                    usesFlavors: editingItem.usesFlavors || false,
-                    usesSizeVariant: editingItem.usesSizeVariant || false,
-                    comboEligible: editingItem.comboEligible ?? true
-                } as MenuItem);
-            }
-            await reload();
-            setIsModalOpen(false);
-            setEditingItem(null);
-        } catch (e) {
-            alert('Error guardando producto');
+            const [pData, cData] = await Promise.all([
+                menuRepo.getAll(),
+                catRepo.getAllOrdered()
+            ]);
+            setProducts(pData);
+            setCategories(cData);
+        } catch (error) {
+            showNotification('error', 'Error cargando datos');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const toggleStatus = async (item: MenuItem) => {
-        await repo.update(item.id, { isAvailable: !item.isAvailable });
-        reload();
+    useEffect(() => { loadData(); }, []);
+
+    const handleSave = async () => {
+        if (!editingItem.name || !editingItem.price || !editingItem.categoryId) {
+            showNotification('error', 'Nombre, Precio y Categoría obligatorios');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const payload = {
+                ...editingItem,
+                usesIngredients: editingItem.usesIngredients || false,
+                usesFlavors: editingItem.usesFlavors || false,
+                usesSizeVariant: editingItem.usesSizeVariant || false,
+                comboEligible: editingItem.comboEligible ?? true,
+                isAvailable: editingItem.isAvailable ?? true
+            };
+
+            if (editingItem.id) {
+                await menuRepo.update(editingItem.id, payload);
+                showNotification('success', 'Producto actualizado');
+            } else {
+                await menuRepo.create(payload as any);
+                showNotification('success', 'Producto creado');
+            }
+            setIsModalOpen(false);
+            loadData();
+        } catch (error) {
+            showNotification('error', 'Error guardando producto');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (item: MenuItem) => {
+        setEditingItem({ ...item }); // Copia para evitar mutación directa
+        setIsModalOpen(true);
+    };
+
+    const handleToggle = async (item: MenuItem) => {
+        try {
+            await menuRepo.update(item.id, { isAvailable: !item.isAvailable });
+            loadData();
+        } catch (error) {
+            showNotification('error', 'Error cambiando disponibilidad');
+        }
     };
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h1>Productos</h1>
+                <h1 style={{ margin: 0 }}>Productos</h1>
                 <Button onClick={() => { setEditingItem({}); setIsModalOpen(true); }}>+ Nuevo Producto</Button>
             </div>
 
             <DataTable 
-                data={allProducts}
-                onToggleActive={toggleStatus}
-                onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
+                data={products}
                 columns={[
                     { header: 'Nombre', accessor: 'name' },
-                    { header: 'Precio ($)', accessor: (item) => item.price.toFixed(2) },
-                    { header: 'Categoría', accessor: (item) => categories.find(c => c.id === item.categoryId)?.name || '---' },
-                    { header: 'Flags', accessor: (item) => (
-                        <div style={{ fontSize: '0.7rem', color: 'gray' }}>
-                            {item.comboEligible && '🏷️Combo '}
-                            {item.usesFlavors && '🍦Sabores '}
+                    { header: 'Precio ($)', accessor: (p) => p.price.toFixed(2) },
+                    { header: 'Categoría', accessor: (p) => categories.find(c => c.id === p.categoryId)?.name || '---' },
+                    { header: 'Config', accessor: (p) => (
+                        <div style={{ fontSize: '0.75rem', color: '#718096' }}>
+                            {p.usesFlavors && '🍦Sabores '}
+                            {p.comboEligible && '📦Combo '}
                         </div>
-                    )}
+                    )},
+                    { header: 'Disponible', accessor: (p) => p.isAvailable ? 'SÍ' : 'NO' }
                 ]}
+                onEdit={handleEdit}
+                onToggleActive={handleToggle}
             />
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem?.id ? 'Editar Producto' : 'Nuevo Producto'}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <input 
-                        className="input-field" 
-                        placeholder="Nombre" 
-                        value={editingItem?.name || ''} 
-                        onChange={e => setEditingItem({...editingItem, name: e.target.value})} 
-                    />
-                    <select 
-                        className="input-field"
-                        value={editingItem?.categoryId || ''}
-                        onChange={e => setEditingItem({...editingItem, categoryId: e.target.value})}
-                    >
-                        <option value="">Seleccionar Categoría</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <input 
-                        className="input-field" 
-                        type="number" 
-                        placeholder="Precio" 
-                        value={editingItem?.price || ''} 
-                        onChange={e => setEditingItem({...editingItem, price: parseFloat(e.target.value)})} 
-                    />
-                    <textarea 
-                        className="input-field"
-                        placeholder="Descripción"
-                        value={editingItem?.description || ''}
-                        onChange={e => setEditingItem({...editingItem, description: e.target.value})}
-                    />
+            <Modal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                title={editingItem.id ? "Editar Producto" : "Nuevo Producto"}
+                footer={
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSave}>Guardar</Button>
+                    </div>
+                }
+            >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{display: 'block', fontSize: '0.9rem'}}>Nombre</label>
+                        <input className="input-field" value={editingItem.name || ''} onChange={e => setEditingItem({...editingItem, name: e.target.value})} />
+                    </div>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <label>
-                            <input type="checkbox" checked={editingItem?.usesFlavors || false} onChange={e => setEditingItem({...editingItem, usesFlavors: e.target.checked})} />
-                            Usa Sabores
-                        </label>
-                        <label>
-                            <input type="checkbox" checked={editingItem?.comboEligible ?? true} onChange={e => setEditingItem({...editingItem, comboEligible: e.target.checked})} />
-                            Elegible para Combos
-                        </label>
+                    <div>
+                        <label style={{display: 'block', fontSize: '0.9rem'}}>Precio ($)</label>
+                        <input type="number" step="0.01" className="input-field" value={editingItem.price || ''} onChange={e => setEditingItem({...editingItem, price: parseFloat(e.target.value)})} />
                     </div>
 
-                    <Button onClick={handleSave}>Guardar</Button>
+                    <div>
+                        <label style={{display: 'block', fontSize: '0.9rem'}}>Categoría</label>
+                        <select className="input-field" value={editingItem.categoryId || ''} onChange={e => setEditingItem({...editingItem, categoryId: e.target.value})}>
+                            <option value="">Seleccione...</option>
+                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{display: 'block', fontSize: '0.9rem'}}>Descripción (Opcional)</label>
+                        <textarea className="input-field" style={{height: '60px'}} value={editingItem.description || ''} onChange={e => setEditingItem({...editingItem, description: e.target.value})} />
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#f7fafc', padding: '10px', borderRadius: '6px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={editingItem.usesFlavors || false} onChange={e => setEditingItem({...editingItem, usesFlavors: e.target.checked})} />
+                            Usa Sabores
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={editingItem.comboEligible ?? true} onChange={e => setEditingItem({...editingItem, comboEligible: e.target.checked})} />
+                            Elegible para Combos
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={editingItem.usesIngredients || false} onChange={e => setEditingItem({...editingItem, usesIngredients: e.target.checked})} />
+                            Usa Ingredientes Extra
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={editingItem.usesSizeVariant || false} onChange={e => setEditingItem({...editingItem, usesSizeVariant: e.target.checked})} />
+                            Variante de Tamaño
+                        </label>
+                    </div>
                 </div>
             </Modal>
         </div>

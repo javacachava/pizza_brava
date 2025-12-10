@@ -1,96 +1,86 @@
-import React, { useEffect, useRef, useState } from 'react';
-import type { Order } from '../../../models/Order';
-import { useKitchen } from '../../../hooks/useKitchen';
+import React from 'react';
+import { useKitchen } from '../../../contexts/KitchenContext';
 import { KitchenColumn } from './components/KitchenColumn';
 import { KioskControls } from './components/KioskControls';
+import type { OrderStatus } from '../../../models/Order';
+import { useAuth } from '../../../hooks/useAuth';
 
 export const KitchenPage: React.FC = () => {
-    const { orders, refreshQueue, updateOrderStatus } = useKitchen();
-    const [prevPending, setPrevPending] = useState(0);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const { orders, updateOrderStatus, isConnected } = useKitchen();
+    const { logout } = useAuth();
 
-    useEffect(() => {
-        audioRef.current = new Audio('/cocina.mp3');
-    }, []);
+    const handleAdvance = (orderId: string, currentStatus: OrderStatus) => {
+        let nextStatus: OrderStatus | null = null;
+        if (currentStatus === 'pending') nextStatus = 'preparing';
+        else if (currentStatus === 'preparing') nextStatus = 'ready';
+        else if (currentStatus === 'ready') nextStatus = 'delivered'; // Desaparece del tablero
 
-    useEffect(() => {
-        const pending = orders.filter(o => o.status === 'pending').length;
-        if (pending > prevPending) {
-            audioRef.current?.play().catch(() => {});
+        if (nextStatus) {
+            updateOrderStatus(orderId, nextStatus);
         }
-        setPrevPending(pending);
-    }, [orders]);
-
-    const advanceStatus = async (id: string, status: Order['status']) => {
-        const next =
-            status === 'pending' ? 'preparing' :
-            status === 'preparing' ? 'ready' :
-            status === 'ready' ? 'delivered' :
-            null;
-
-        if (next) await updateOrderStatus(id, next);
     };
 
-    const pending = orders.filter(o => o.status === 'pending');
-    const preparing = orders.filter(o => o.status === 'preparing');
-    const ready = orders.filter(o => o.status === 'ready');
+    const pendingOrders = orders.filter(o => o.status === 'pending');
+    const preparingOrders = orders.filter(o => o.status === 'preparing');
+    const readyOrders = orders.filter(o => o.status === 'ready');
 
     return (
-        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-            
-            <div style={{
-                padding: '10px 20px',
-                backgroundColor: '#2d3748',
-                color: 'white',
-                display: 'flex',
-                justifyContent: 'space-between'
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#1a202c', color: 'white', overflow: 'hidden' }}>
+            {/* Header Minimalista */}
+            <div style={{ 
+                padding: '10px 20px', 
+                backgroundColor: '#2d3748', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                borderBottom: '1px solid #4a5568'
             }}>
-                <h1 style={{ margin: 0 }}>👨‍🍳 Cocina</h1>
-                <div>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'})}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <h1 style={{ margin: 0, fontSize: '1.4rem', color: '#f6ad55' }}>👨‍🍳 KDS Pizza Brava</h1>
+                    <span style={{ 
+                        fontSize: '0.8rem', 
+                        padding: '2px 6px', 
+                        borderRadius: '4px', 
+                        backgroundColor: isConnected ? '#48bb78' : '#e53e3e',
+                        color: 'white'
+                    }}>
+                        {isConnected ? 'ONLINE' : 'OFFLINE'}
+                    </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
+                    <button onClick={logout} style={{ background: 'none', border: '1px solid #718096', color: '#cbd5e0', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer' }}>Salir</button>
+                </div>
             </div>
 
-            <div style={{ flex: 1, display: 'flex', padding: 10, background: '#1a202c' }}>
-                <KitchenColumn
-                    title="Nuevas"
-                    color="#c53030"
-                    orders={pending}
-                    onAdvance={advanceStatus}
+            {/* Tablero Kanban */}
+            <div style={{ flex: 1, display: 'flex', padding: '10px', overflow: 'hidden', gap: '10px' }}>
+                <KitchenColumn 
+                    title="NUEVAS" 
+                    orders={pendingOrders} 
+                    status="pending" 
+                    color="#c53030" 
+                    onAdvance={handleAdvance}
                 />
-
-                <KitchenColumn
-                    title="Preparación"
-                    color="#dd6b20"
-                    orders={preparing}
-                    onAdvance={advanceStatus}
+                <KitchenColumn 
+                    title="EN HORNO" 
+                    orders={preparingOrders} 
+                    status="preparing" 
+                    color="#dd6b20" 
+                    onAdvance={handleAdvance}
                 />
-
-                <KitchenColumn
-                    title="Listas"
-                    color="#2f855a"
-                    orders={ready}
-                    onAdvance={advanceStatus}
+                <KitchenColumn 
+                    title="LISTAS" 
+                    orders={readyOrders} 
+                    status="ready" 
+                    color="#2f855a" 
+                    onAdvance={handleAdvance}
                 />
             </div>
 
-            <KioskControls/>
-
-            <button
-                onClick={refreshQueue}
-                style={{
-                    position: 'fixed',
-                    bottom: 10,
-                    left: 10,
-                    borderRadius: '50%',
-                    width: 45,
-                    height: 45,
-                    backgroundColor: '#4a5568',
-                    color: 'white',
-                    border: 'none',
-                    opacity: 0.6
-                }}
-            >
-                ↻
-            </button>
+            <KioskControls />
         </div>
     );
 };

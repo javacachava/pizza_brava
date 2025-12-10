@@ -1,12 +1,13 @@
 import React from 'react';
-import type { Order } from '../../../../models/Order';
+import type { Order, OrderStatus } from '../../../../models/Order';
 import { KitchenOrderCard } from './KitchenOrderCard';
 
 interface Props {
     title: string;
     orders: Order[];
     color: string;
-    onAdvance: (orderId: string, currentStatus: Order['status']) => void;
+    status?: OrderStatus;
+    onAdvance: (orderId: string, currentStatus: OrderStatus) => void;
 }
 
 export const KitchenColumn: React.FC<Props> = ({ title, orders, color, onAdvance }) => {

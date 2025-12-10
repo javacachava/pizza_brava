@@ -1,14 +1,18 @@
 import { OrdersRepository } from '../../repos/OrdersRepository';
-import type { Order } from '../../models/Order';
+import type { Order, OrderStatus } from '../../models/Order';
 
 export class KitchenService {
-    private ordersRepo = new OrdersRepository();
+    private ordersRepo: OrdersRepository;
 
-    async getQueue(): Promise<Order[]> {
-        return await this.ordersRepo.getActiveOrders();
+    constructor() {
+        this.ordersRepo = new OrdersRepository();
     }
 
-    async updateStatus(orderId: string, status: Order['status']): Promise<void> {
-        await this.ordersRepo.update(orderId, { status });
+    subscribeToOrders(onUpdate: (orders: Order[]) => void): () => void {
+        return this.ordersRepo.subscribeToActiveOrders(onUpdate);
+    }
+
+    async updateStatus(orderId: string, status: OrderStatus): Promise<void> {
+        await this.ordersRepo.updateStatus(orderId, status);
     }
 }

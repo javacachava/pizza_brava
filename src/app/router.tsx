@@ -1,48 +1,84 @@
-import { createBrowserRouter } from "react-router-dom";
-import { MainLayout } from "./layout/MainLayout";
+import React, { useEffect } from 'react';
+import { createBrowserRouter, useNavigate, useLocation } from 'react-router-dom';
+import { MainLayout } from './layout/MainLayout';
+import { AdminLayout } from './pages/admin/AdminLayout';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
 
-import { POSPage } from "./pages/pos/POSPage";
-import { KitchenPage } from "./pages/kitchen/KitchenPage";
-import { AdminLayout } from "./pages/admin/AdminLayout";
-import { Dashboard } from "./pages/admin/Dashboard";
-import { ProductsManager } from "./pages/admin/ProductsManager";
-import { CategoriesManager } from "./pages/admin/CategoriesManager";
-import { CashClose } from "./pages/admin/CashClose";
-import { UsersManager } from "./pages/admin/UsersManager";
-import { FlavorsManager } from "./pages/admin/FlavorsManager";
-import { SizesManager } from "./pages/admin/SizesManager";
-import { IngredientsManager } from "./pages/admin/IngredientsManager";
-import { CombosManager } from "./pages/admin/CombosManager";
-import { AccompanimentsManager } from "./pages/admin/AccompanimentsManager";
-import { RulesManager } from "./pages/admin/RulesManager";
+import { LoginPage } from './components/auth/LoginPage';
+import { Dashboard } from './pages/admin/Dashboard';
+import { ProductsManager } from './pages/admin/ProductsManager';
+import { CategoriesManager } from './pages/admin/CategoriesManager';
+import { UsersManager } from './pages/admin/UsersManager';
+import { CashClose } from './pages/admin/CashClose';
+import { POSPage } from './pages/pos/POSPage';
+import { KitchenPage } from './pages/kitchen/KitchenPage';
 
-const LoginPage = () => <div>Login</div>;
+const RootDispatcher: React.FC = () => {
+    const { user, isAuthenticated, loading } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!loading) {
+            if (isAuthenticated && user) {
+                switch(user.role) {
+                    case 'admin': navigate('/admin'); break;
+                    case 'cashier': navigate('/pos'); break;
+                    case 'kitchen': navigate('/kitchen'); break;
+                    default: navigate('/pos');
+                }
+            }
+        }
+    }, [user, isAuthenticated, loading, navigate]);
+
+    if (loading) return <div>Cargando...</div>;
+    return <LoginPage />;
+};
 
 export const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <MainLayout />,
-    children: [
-      { index: true, element: <LoginPage /> },
-      { path: "pos", element: <POSPage /> },
-      { path: "kitchen", element: <KitchenPage /> },
-      {
-        path: "admin",
-        element: <AdminLayout />,
+    {
+        path: '/',
+        element: <MainLayout />,
         children: [
-          { index: true, element: <Dashboard /> },
-          { path: "products", element: <ProductsManager /> },
-          { path: "categories", element: <CategoriesManager /> },
-          { path: "orders", element: <CashClose /> },
-          { path: "users", element: <UsersManager /> },
-          { path: "flavors", element: <FlavorsManager /> },
-          { path: "sizes", element: <SizesManager /> },
-          { path: "ingredients", element: <IngredientsManager /> },
-          { path: "combos", element: <CombosManager /> },
-          { path: "accompaniments", element: <AccompanimentsManager /> },
-          { path: "rules", element: <RulesManager /> },
+            { 
+                index: true, 
+                element: <RootDispatcher /> 
+            },
+            {
+                path: 'login',
+                element: <LoginPage />
+            },
+            {
+                path: 'admin',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminLayout />
+                    </ProtectedRoute>
+                ),
+                children: [
+                    { path: '', element: <Dashboard /> },
+                    { path: 'products', element: <ProductsManager /> },
+                    { path: 'categories', element: <CategoriesManager /> },
+                    { path: 'users', element: <UsersManager /> }, 
+                    { path: 'orders', element: <CashClose /> }
+                ]
+            },
+            {
+                path: 'pos',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'cashier', 'waiter']}>
+                        <POSPage />
+                    </ProtectedRoute>
+                )
+            },
+            {
+                path: 'kitchen',
+                element: (
+                    <ProtectedRoute allowedRoles={['admin', 'kitchen']}>
+                        <KitchenPage />
+                    </ProtectedRoute>
+                )
+            }
         ]
-      }
-    ],
-  },
+    }
 ]);

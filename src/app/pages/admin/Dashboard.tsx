@@ -1,70 +1,101 @@
 import React, { useEffect, useState } from 'react';
 import { ReportsService } from '../../../services/domain/ReportsService';
 import { SimpleChart } from './components/SimpleChart';
+import { StatCard } from './components/StatCard';
 import { Button } from '../../components/ui/Button';
+import { useAdmin } from '../../../contexts/AdminContext';
 
 export const Dashboard: React.FC = () => {
+    const { setLoading } = useAdmin();
     const [stats, setStats] = useState<any>(null);
     const [range, setRange] = useState<'day' | 'week' | 'month'>('day');
+    
     const reportsService = new ReportsService();
 
     useEffect(() => {
-        reportsService.getDashboardStats(range).then(setStats);
+        const loadStats = async () => {
+            setLoading(true);
+            try {
+                const data = await reportsService.getDashboardStats(range);
+                setStats(data);
+            } catch (error) {
+                console.error("Error loading stats", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadStats();
     }, [range]);
 
-    const handlePrint = () => {
-        window.print();
-    };
-
-    if (!stats) return <div>Calculando métricas...</div>;
+    if (!stats) return <div style={{ padding: '20px' }}>Cargando métricas...</div>;
 
     return (
         <div className="printable-area">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h1 style={{ margin: 0 }}>Reporte de Operaciones</h1>
-                <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+                <div>
+                    <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#2d3748' }}>Dashboard</h1>
+                    <p style={{ margin: '5px 0 0 0', color: '#718096' }}>Resumen operativo de Pizza Brava</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <select 
                         value={range} 
                         onChange={(e) => setRange(e.target.value as any)}
-                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e0' }}
+                        style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e0', backgroundColor: 'white' }}
                     >
                         <option value="day">Hoy</option>
                         <option value="week">Esta Semana</option>
                         <option value="month">Este Mes</option>
                     </select>
-                    <Button onClick={handlePrint}>🖨️ PDF / Imprimir</Button>
+                    <Button onClick={() => window.print()} variant="outline">🖨️ Imprimir Reporte</Button>
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
-                <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', borderLeft: '4px solid #3182ce' }}>
-                    <div style={{ color: '#718096', fontSize: '0.9rem' }}>Ventas Totales</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>${stats.totalSales.toFixed(2)}</div>
-                </div>
-                <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', borderLeft: '4px solid #38a169' }}>
-                    <div style={{ color: '#718096', fontSize: '0.9rem' }}>Órdenes Totales</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{stats.totalOrders}</div>
-                </div>
-                <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', borderLeft: '4px solid #d69e2e' }}>
-                    <div style={{ color: '#718096', fontSize: '0.9rem' }}>Ticket Promedio</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>${stats.averageTicket.toFixed(2)}</div>
-                </div>
+            {/* KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+                <StatCard 
+                    title="Ventas Totales" 
+                    value={`$${stats.totalSales.toFixed(2)}`} 
+                    icon="💰" 
+                    trend={0} 
+                    color="blue"
+                />
+                <StatCard 
+                    title="Órdenes" 
+                    value={stats.totalOrders} 
+                    icon="🧾" 
+                    color="green"
+                />
+                <StatCard 
+                    title="Ticket Promedio" 
+                    value={`$${stats.averageTicket.toFixed(2)}`} 
+                    icon="📊" 
+                    color="orange"
+                />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '25px', alignItems: 'start' }}>
+                {/* Gráfica */}
                 <SimpleChart 
-                    title="Top 5 Productos Más Vendidos" 
+                    title={`Top 5 Productos (${range === 'day' ? 'Hoy' : range === 'week' ? 'Semana' : 'Mes'})`} 
                     color="#ff6b00"
-                    data={stats.topProducts.map((p: any) => ({ label: p.name.slice(0, 10), value: p.count }))} 
+                    data={stats.topProducts.map((p: any) => ({ label: p.name.slice(0, 15), value: p.count }))} 
                 />
                 
-                <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px' }}>
-                    <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem' }}>Detalle Top Ventas</h3>
-                    <ul style={{ listStyle: 'none', padding: 0 }}>
+                {/* Lista Top */}
+                <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', color: '#2d3748', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' }}>Detalle de Ventas</h3>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                        {stats.topProducts.length === 0 && <li style={{ color: '#a0aec0', textAlign: 'center' }}>Sin datos aún</li>}
                         {stats.topProducts.map((p: any, i: number) => (
-                            <li key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #edf2f7' }}>
-                                <span>{i+1}. {p.name}</span>
-                                <span style={{ fontWeight: 'bold' }}>${p.total.toFixed(2)}</span>
+                            <li key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px dashed #edf2f7' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ backgroundColor: '#edf2f7', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold', color: '#718096' }}>{i+1}</span>
+                                    <span>{p.name}</span>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontWeight: 'bold', color: '#2d3748' }}>{p.count} und.</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#718096' }}>${p.total.toFixed(2)}</div>
+                                </div>
                             </li>
                         ))}
                     </ul>

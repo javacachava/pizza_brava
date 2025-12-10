@@ -1,39 +1,34 @@
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
 import { UsersRepository } from '../../repos/UsersRepository';
-import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-
-import type { User } from '../../models/User';
+import type { User, UserRole } from '../../models/User';
 
 export class UsersAdminService {
-  private repo = new UsersRepository();
-  private auth = getAuth();
+    private usersRepo: UsersRepository;
 
-  async listAll(): Promise<User[]> {
-    return this.repo.getAll();
-  }
+    constructor() {
+        this.usersRepo = new UsersRepository();
+    }
 
-  async createUser(email: string, password: string, name: string, role: User['role'] = 'cashier') {
-    const userCred = await createUserWithEmailAndPassword(this.auth, email, password);
-    const uid = userCred.user.uid;
-    await this.repo.create({
-      id: uid,
-      email,
-      name,
-      role,
-      isActive: true,
-      createdAt: new Date()
-    } as any);
-    return uid;
-  }
+    async getAllUsers(): Promise<User[]> {
+        return await this.usersRepo.getAll();
+    }
 
-  async resetPassword(email: string) {
-    return sendPasswordResetEmail(this.auth, email);
-  }
+    async createUser(data: { email: string; password: string; name: string; role: UserRole }): Promise<void> {
+        try {
+            const createUserFunction = httpsCallable(functions, 'createUser');
+            await createUserFunction(data);
+        } catch (error: any) {
+            console.error("Error creating user:", error);
+            throw new Error(error.message || "Error al crear usuario.");
+        }
+    }
 
-  async updateUser(id: string, data: Partial<User>) {
-    return this.repo.update(id, data);
-  }
+    async updateUser(id: string, data: Partial<User>): Promise<void> {
+        await this.usersRepo.update(id, data);
+    }
 
-  async toggleActive(id: string, value: boolean) {
-    return this.repo.update(id, { isActive: value });
-  }
+    async toggleUserStatus(user: User): Promise<void> {
+        await this.usersRepo.update(user.id, { isActive: !user.isActive });
+    }
 }
