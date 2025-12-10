@@ -5,14 +5,14 @@ import type { UserRole } from '../../../models/User';
 
 interface Props {
     children: React.ReactNode;
-    allowedRoles?: UserRole[];
+    allowedRoles?: UserRole[]; // Roles permitidos
 }
 
 export const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
     const { user, loading, isAuthenticated } = useAuth();
     const location = useLocation();
 
-    // 1. Mientras carga, mostrar spinner (evita redirecciones prematuras)
+    // 1. Loading: evita redirecciones antes de tiempo
     if (loading) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
@@ -22,18 +22,23 @@ export const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
         );
     }
 
-    // 2. Si terminó de cargar y no hay usuario -> Login
+    // 2. No autenticado → Login
     if (!isAuthenticated || !user) {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // 3. Verificación de Rol
-    if (allowedRoles && !allowedRoles.includes(user.role) && user.role !== 'admin') {
-        // Si intenta entrar donde no debe, lo mandamos a su home segura
-        const safePath = user.role === 'kitchen' ? '/kitchen' : '/pos';
+    // 3. Validación de rol según allowedRoles
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+        // HOME seguro por rol
+        let safePath = '/pos';
+
+        if (user.role === 'admin') safePath = '/admin';
+        else if (user.role === 'cocina') safePath = '/kitchen';
+        else if (user.role === 'recepcion') safePath = '/pos';
+
         return <Navigate to={safePath} replace />;
     }
 
-    // 4. Todo correcto
+    // 4. Todo correcto → Renderiza
     return <>{children}</>;
 };

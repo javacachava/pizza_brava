@@ -15,8 +15,7 @@ import { CashClose } from './pages/admin/CashClose';
 import { POSPage } from './pages/pos/POSPage';
 import { KitchenPage } from './pages/kitchen/KitchenPage';
 
-// Componente simple que decide a dónde ir.
-// NO usa useEffect para evitar bucles. Usa renderizado condicional.
+// Decide redirección inicial
 const RootRedirect: React.FC = () => {
     const { user, isAuthenticated, loading } = useAuth();
 
@@ -32,11 +31,11 @@ const RootRedirect: React.FC = () => {
         return <Navigate to="/login" replace />;
     }
 
-    // Redirección por rol
+    // Redirección por rol real
     if (user.role === 'admin') return <Navigate to="/admin" replace />;
-    if (user.role === 'kitchen') return <Navigate to="/kitchen" replace />;
-    
-    // Default para cajeros/meseros
+    if (user.role === 'cocina') return <Navigate to="/kitchen" replace />;
+    if (user.role === 'recepcion') return <Navigate to="/pos" replace />;
+
     return <Navigate to="/pos" replace />;
 };
 
@@ -49,11 +48,13 @@ export const router = createBrowserRouter([
                 index: true, 
                 element: <RootRedirect /> 
             },
+
             {
                 path: 'login',
                 element: <LoginPage />
             },
-            // --- ADMIN ---
+
+            // ADMIN
             {
                 path: 'admin',
                 element: (
@@ -69,24 +70,27 @@ export const router = createBrowserRouter([
                     { path: 'orders', element: <CashClose /> }
                 ]
             },
-            // --- POS ---
+
+            // POS (Recepción)
             {
                 path: 'pos',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'cashier', 'waiter']}>
+                    <ProtectedRoute allowedRoles={['admin', 'recepcion']}>
                         <POSPage />
                     </ProtectedRoute>
                 )
             },
-            // --- KITCHEN ---
+
+            // KITCHEN - Cocina
             {
                 path: 'kitchen',
                 element: (
-                    <ProtectedRoute allowedRoles={['admin', 'kitchen']}>
+                    <ProtectedRoute allowedRoles={['admin', 'cocina']}>
                         <KitchenPage />
                     </ProtectedRoute>
                 )
             },
+
             {
                 path: '*',
                 element: <Navigate to="/" replace />
