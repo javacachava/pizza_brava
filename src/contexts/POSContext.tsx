@@ -22,7 +22,6 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [cart, setCart] = useState<OrderItem[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     
-    // Cálculo seguro de totales
     const total = cart.reduce((acc, item) => acc + item.totalPrice, 0);
 
     const addToCart = (newItem: OrderItem) => {
@@ -48,14 +47,22 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const clearCart = () => setCart([]);
 
     const placeOrder = async (customerName: string, type: 'dine-in' | 'takeaway' | 'delivery', extraData?: any) => {
-        if (!user) throw new Error("Sesión expirada");
+        if (!user) throw new Error("Sesión no válida");
+        
         setIsProcessing(true);
         try {
-            const id = await posService.createOrder(cart, customerName, type, user.id, extraData?.tableNumber);
+            const orderId = await posService.createOrder(
+                cart,
+                customerName,
+                type,
+                user.id,
+                extraData?.tableNumber
+            );
             clearCart();
-            return id;
-        } catch (e) {
-            throw e;
+            return orderId;
+        } catch (error) {
+            console.error(error);
+            throw error;
         } finally {
             setIsProcessing(false);
         }
@@ -68,7 +75,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 };
 
-// Exportación nombrada explícita para evitar errores de vite
+// Exportamos con nombre específico para evitar colisiones
 export const usePOSContext = () => {
     const context = useContext(POSContext);
     if (!context) throw new Error("usePOSContext must be used within POSProvider");

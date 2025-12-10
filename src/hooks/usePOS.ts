@@ -1,6 +1,6 @@
 import { usePOSContext } from '../contexts/POSContext';
 
-// Hook puente simple para mantener arquitectura limpia
+// Este hook es la interfaz pública para los componentes
 export const usePOS = () => {
     return usePOSContext();
 };

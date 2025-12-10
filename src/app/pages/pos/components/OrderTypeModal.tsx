@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
-import { usePOS } from '../../../../contexts/POSContext';
+import { usePOS } from '../../../../hooks/usePOS'; // <--- IMPORTACIÓN CORREGIDA
 
 interface Props {
     isOpen: boolean;
@@ -14,7 +14,6 @@ export const OrderTypeModal: React.FC<Props> = ({ isOpen, onClose }) => {
     const [step, setStep] = useState<'type' | 'details'>('type');
     const [orderType, setOrderType] = useState<'dine-in' | 'takeaway' | 'delivery'>('dine-in');
     
-    // Formulario
     const [customerName, setCustomerName] = useState('');
     const [phone, setPhone] = useState('');
     const [address, setAddress] = useState('');
@@ -35,48 +34,21 @@ export const OrderTypeModal: React.FC<Props> = ({ isOpen, onClose }) => {
     };
 
     const handleConfirm = async () => {
-        // --- REGLAS DE NEGOCIO Y VALIDACIÓN ---
-        
-        // 1. Nombre casi siempre requerido para tracking, salvo quizá dine-in rápido
-        if (!customerName.trim()) {
-            alert("Por favor ingresa el nombre del cliente.");
-            return;
-        }
-
-        // 2. Regla: Domicilio exige Teléfono y Dirección
-        if (orderType === 'delivery') {
-            if (!phone.trim() || !address.trim()) {
-                alert("Para Domicilio, el Teléfono y la Dirección son OBLIGATORIOS.");
-                return;
-            }
-        }
-
-        // 3. Regla: Mesa exige número de mesa
-        if (orderType === 'dine-in' && !tableNumber.trim()) {
-            alert("Por favor ingresa el número de mesa.");
-            return;
-        }
+        if (!customerName.trim()) return alert("Nombre obligatorio");
+        if (orderType === 'delivery' && (!phone || !address)) return alert("Teléfono y Dirección obligatorios para domicilio");
+        if (orderType === 'dine-in' && !tableNumber) return alert("Número de mesa obligatorio");
 
         try {
-            // Concatenamos datos sensibles al nombre/notas si el modelo Order no tiene campos específicos aún
-            // O los pasamos al servicio si este lo soporta.
-            // Asumimos que POSService maneja 'tableNumber'.
-            // Para phone/address, los adjuntamos al nombre del cliente para visualización simple en Ticket,
-            // PERO recordamos que en Cocina esto debe filtrarse (ya implementado en KitchenOrderCard).
-            
-            let finalCustomerName = customerName;
-            if (orderType === 'delivery') {
-                finalCustomerName = `${customerName} | 📞 ${phone} | 📍 ${address}`;
-            } else if (orderType === 'takeaway' && phone) {
-                finalCustomerName = `${customerName} | 📞 ${phone}`;
-            }
+            // Concatenamos datos para display simple
+            let finalName = customerName;
+            if (orderType === 'delivery') finalName += ` | 📞 ${phone} | 📍 ${address}`;
+            else if (orderType === 'takeaway' && phone) finalName += ` | 📞 ${phone}`;
 
-            await placeOrder(finalCustomerName, orderType, { tableNumber });
-            
-            alert("¡Orden enviada a cocina!");
+            await placeOrder(finalName, orderType, { tableNumber });
+            alert("Orden enviada exitosamente");
             reset();
         } catch (error) {
-            alert("Error al guardar la orden. Intente nuevamente.");
+            alert("Error procesando la orden");
         }
     };
 
@@ -84,56 +56,79 @@ export const OrderTypeModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <Modal 
             isOpen={isOpen} 
             onClose={reset} 
-            title={step === 'type' ? "Tipo de Pedido" : `Detalles: ${orderType.toUpperCase()}`}
+            title={step === 'type' ? "Selecciona Tipo de Pedido" : "Detalles del Cliente"}
         >
             {step === 'type' ? (
-                <div style={{ display: 'grid', gap: '15px' }}>
-                    <Button variant="outline" style={{ height: '70px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }} onClick={() => handleTypeSelect('dine-in')}>
-                        🍽️ Comer Aquí (Mesa)
-                    </Button>
-                    <Button variant="outline" style={{ height: '70px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }} onClick={() => handleTypeSelect('takeaway')}>
-                        👜 Para Llevar
-                    </Button>
-                    <Button variant="outline" style={{ height: '70px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }} onClick={() => handleTypeSelect('delivery')}>
-                        🛵 Domicilio / Teléfono
-                    </Button>
+                <div className="grid gap-4 py-4">
+                    <button 
+                        onClick={() => handleTypeSelect('dine-in')}
+                        className="flex items-center p-6 border-2 border-slate-100 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group"
+                    >
+                        <span className="text-3xl mr-4 group-hover:scale-110 transition-transform">🍽️</span>
+                        <div className="text-left">
+                            <h3 className="font-bold text-slate-800">Comer en Mesa</h3>
+                            <p className="text-sm text-slate-500">Servicio tradicional</p>
+                        </div>
+                    </button>
+
+                    <button 
+                        onClick={() => handleTypeSelect('takeaway')}
+                        className="flex items-center p-6 border-2 border-slate-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                    >
+                        <span className="text-3xl mr-4 group-hover:scale-110 transition-transform">👜</span>
+                        <div className="text-left">
+                            <h3 className="font-bold text-slate-800">Para Llevar</h3>
+                            <p className="text-sm text-slate-500">Recoger en mostrador</p>
+                        </div>
+                    </button>
+
+                    <button 
+                        onClick={() => handleTypeSelect('delivery')}
+                        className="flex items-center p-6 border-2 border-slate-100 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group"
+                    >
+                        <span className="text-3xl mr-4 group-hover:scale-110 transition-transform">🛵</span>
+                        <div className="text-left">
+                            <h3 className="font-bold text-slate-800">Domicilio</h3>
+                            <p className="text-sm text-slate-500">Pedido telefónico</p>
+                        </div>
+                    </button>
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div className="flex flex-col gap-4 py-2">
                     <div>
-                        <label style={{display: 'block', fontSize: '0.9rem', marginBottom: '4px', fontWeight: 'bold'}}>Nombre del Cliente *</label>
-                        <input className="input-field" autoFocus type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} style={{ width: '100%', padding: '10px' }} />
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Nombre Cliente *</label>
+                        <input className="input-field" autoFocus value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Ej: Juan Pérez" />
                     </div>
 
                     {orderType === 'dine-in' && (
                          <div>
-                            <label style={{display: 'block', fontSize: '0.9rem', marginBottom: '4px', fontWeight: 'bold'}}>Número de Mesa *</label>
-                            <input className="input-field" type="text" value={tableNumber} onChange={e => setTableNumber(e.target.value)} style={{ width: '100%', padding: '10px' }} />
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Número de Mesa *</label>
+                            <input className="input-field" type="number" value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Ej: 5" />
                         </div>
                     )}
 
                     {(orderType === 'delivery' || orderType === 'takeaway') && (
                         <div>
-                            <label style={{display: 'block', fontSize: '0.9rem', marginBottom: '4px', fontWeight: 'bold'}}>Teléfono {orderType === 'delivery' && '*'}</label>
-                            <input className="input-field" type="tel" value={phone} onChange={e => setPhone(e.target.value)} style={{ width: '100%', padding: '10px' }} />
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Teléfono {orderType === 'delivery' && '*'}</label>
+                            <input className="input-field" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ej: 7777-7777" />
                         </div>
                     )}
 
                     {orderType === 'delivery' && (
                         <div>
-                            <label style={{display: 'block', fontSize: '0.9rem', marginBottom: '4px', fontWeight: 'bold'}}>Dirección Exacta *</label>
-                            <textarea value={address} onChange={e => setAddress(e.target.value)} style={{ width: '100%', padding: '10px', height: '80px', borderRadius: '6px', borderColor: '#cbd5e0' }} placeholder="Colonia, # Casa, Referencia..." />
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Dirección Exacta *</label>
+                            <textarea className="input-field h-24 resize-none" value={address} onChange={e => setAddress(e.target.value)} placeholder="Colonia, Calle, # Casa..." />
                         </div>
                     )}
 
-                    <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                        <div style={{ fontSize: '1.2rem', textAlign: 'right', marginBottom: '15px' }}>
-                            Total a Cobrar: <strong>${total.toFixed(2)}</strong>
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div className="text-lg font-bold text-slate-800">
+                            Total: <span className="text-orange-600">${total.toFixed(2)}</span>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div className="flex gap-3">
                             <Button variant="secondary" onClick={() => setStep('type')} disabled={isProcessing}>Atrás</Button>
-                            <Button variant="primary" style={{ flex: 1 }} onClick={handleConfirm} disabled={isProcessing}>
-                                {isProcessing ? 'Procesando...' : 'CONFIRMAR ORDEN'}
+                            <Button variant="primary" onClick={handleConfirm} isLoading={isProcessing}>
+                                Confirmar Orden
                             </Button>
                         </div>
                     </div>
