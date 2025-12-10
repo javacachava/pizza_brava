@@ -2,11 +2,9 @@ export interface MenuItem {
     id: string;
     categoryId: string;
     name: string;
-    price: number;
-    isAvailable: boolean;
     description?: string;
-    image?: string;
-
+    price: number;
+    isAvailable: boolean; // REGLA: Campo correcto para disponibilidad
     usesIngredients: boolean;
     usesFlavors: boolean;
     usesSizeVariant: boolean;

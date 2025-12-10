@@ -1,11 +1,9 @@
-export type UserRole = 'admin' | 'cocina' | 'recepcion' ;
+export type UserRole = 'admin' | 'cocina' | 'recepcion';
 
 export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  isActive: boolean;
-  createdAt?: Date | any;
-  phone?: string;
+    id: string; // ID de Firestore
+    email: string;
+    name: string;
+    role: UserRole;
+    active: boolean; // REGLA: Usar 'active', no 'status' ni 'isActive'
 }

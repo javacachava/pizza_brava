@@ -5,14 +5,14 @@ import type { UserRole } from '../../../models/User';
 
 interface Props {
     children: React.ReactNode;
-    allowedRoles?: UserRole[]; // Roles permitidos
+    allowedRoles?: UserRole[];
 }
 
 export const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
     const { user, loading, isAuthenticated } = useAuth();
     const location = useLocation();
 
-    // 1. Loading: evita redirecciones antes de tiempo
+    // 1. Loading
     if (loading) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
@@ -22,23 +22,36 @@ export const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
         );
     }
 
-    // 2. No autenticado → Login
+    // 2. No autenticado
     if (!isAuthenticated || !user) {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // 3. Validación de rol según allowedRoles
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-        // HOME seguro por rol
-        let safePath = '/pos';
-
-        if (user.role === 'admin') safePath = '/admin';
-        else if (user.role === 'cocina') safePath = '/kitchen';
-        else if (user.role === 'recepcion') safePath = '/pos';
-
-        return <Navigate to={safePath} replace />;
+    // 3. Usuario inactivo
+    if (user.active === false) {
+        return (
+            <div className="h-screen w-full flex items-center justify-center text-red-600 text-xl font-semibold">
+                Su cuenta está desactivada. Contacte al administrador.
+            </div>
+        );
     }
 
-    // 4. Todo correcto → Renderiza
+    // 4. Validación de roles
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+
+        // Redirección oficial por rol
+        switch (user.role) {
+            case 'admin': 
+                return <Navigate to="/admin/dashboard" replace />;
+            case 'cocina': 
+                return <Navigate to="/kitchen" replace />;
+            case 'recepcion': 
+                return <Navigate to="/pos" replace />;
+            default:
+                return <Navigate to="/login" replace />;
+        }
+    }
+
+    // 5. Autorizado
     return <>{children}</>;
 };

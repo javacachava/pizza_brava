@@ -2,5 +2,6 @@ export interface Category {
     id: string;
     name: string;
     order: number;
-    isActive?: boolean;
+    // REGLA: No existe 'active' ni 'status' en la BD.
+    // Si el UI lo necesita, el repositorio lo inyectará como true.
 }

@@ -12,26 +12,16 @@ export const LoginPage: React.FC = () => {
     const [error, setError] = useState('');
     const [focusedField, setFocusedField] = useState<string | null>(null);
 
-    // === NUEVO handleLogin (reemplaza el anterior) ===
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-
-        try {
-            await login(email, password);
-            // No redirigimos aquí. Lo hará el useEffect al detectar el usuario.
-        } catch (error) {
-            console.error("Login fallido", error);
-            setError("Credenciales inválidas");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // === NUEVO USEEFFECT PARA REDIRECCIÓN POR ROL ===
+    // === NUEVO USEEFFECT CON VALIDACIÓN DE USUARIO ACTIVO ===
     useEffect(() => {
         if (user) {
+            // Validar si el usuario está activo en Firestore
+            if (user.active === false) {
+                setError("Usuario inactivo. Contacte al administrador.");
+                return;
+            }
+
+            // Redirección por rol REAL
             switch (user.role) {
                 case 'admin':
                     navigate('/admin/dashboard');
@@ -42,9 +32,29 @@ export const LoginPage: React.FC = () => {
                 case 'recepcion':
                     navigate('/pos');
                     break;
+                default:
+                    // Fallback seguro
+                    navigate('/pos');
             }
         }
     }, [user, navigate]);
+
+    // === handleLogin ===
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        try {
+            await login(email, password);
+            // No redirigimos aquí, el useEffect maneja todo.
+        } catch (error) {
+            console.error("Login fallido", error);
+            setError("Credenciales inválidas");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen flex bg-white font-sans text-slate-800 selection:bg-orange-100 selection:text-orange-600">
@@ -96,8 +106,8 @@ export const LoginPage: React.FC = () => {
                         </div>
                     )}
 
-                    {/* === IMPORTANTE: AHORA USA handleLogin === */}
                     <form onSubmit={handleLogin} className="space-y-6">
+                        {/* Campo Email */}
                         <div className={`transition-all duration-300 ${focusedField === 'email' ? 'scale-[1.02]' : ''}`}>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
                                 Correo Electrónico
@@ -117,6 +127,7 @@ export const LoginPage: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Campo Password */}
                         <div className={`transition-all duration-300 ${focusedField === 'password' ? 'scale-[1.02]' : ''}`}>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
                                 Contraseña
