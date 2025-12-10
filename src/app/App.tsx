@@ -7,19 +7,27 @@ import { POSProvider } from '../contexts/POSContext';
 import { KitchenProvider } from '../contexts/KitchenContext';
 import { AdminProvider } from '../contexts/AdminContext';
 
+// Un componente wrapper para los Providers de Datos que requieren Auth
+const DataProviders: React.FC<{children: React.ReactNode}> = ({ children }) => (
+  <AdminProvider>
+    <MenuProvider>
+      <POSProvider>
+        <KitchenProvider>
+          {children}
+        </KitchenProvider>
+      </POSProvider>
+    </MenuProvider>
+  </AdminProvider>
+);
+
 const App: React.FC = () => {
   return (
     <React.StrictMode>
+      {/* AuthProvider es el nivel más alto */}
       <AuthProvider>
-        <AdminProvider>
-          <MenuProvider>
-            <POSProvider>
-              <KitchenProvider>
-                <RouterProvider router={router} />
-              </KitchenProvider>
-            </POSProvider>
-          </MenuProvider>
-        </AdminProvider>
+        <DataProviders>
+          <RouterProvider router={router} />
+        </DataProviders>
       </AuthProvider>
     </React.StrictMode>
   );

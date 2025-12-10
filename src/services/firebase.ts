@@ -1,14 +1,11 @@
-import { initializeApp } from "firebase/app";
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getAnalytics } from "firebase/analytics";
 
-export const firebaseConfig = {
+// Configuración oficial de Firebase (credenciales reales)
+const firebaseConfig = {
   apiKey: "AIzaSyBrDyjHHE8Fut5xJWnxexj6rtax-Jsvdqs",
   authDomain: "pizza-brava-dev.firebaseapp.com",
   projectId: "pizza-brava-dev",
@@ -18,14 +15,34 @@ export const firebaseConfig = {
   measurementId: "G-2RYZ83SFSY"
 };
 
-const app = initializeApp(firebaseConfig);
+// Inicializar Firebase solo una vez (manejo de Vite + HMR)
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
-
+// Exportar servicios
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const functions = getFunctions(app);
-export const analytics = getAnalytics(app);
+
+// Analytics (solo en producción y navegador)
+if (typeof window !== "undefined" && location.hostname !== "localhost") {
+  getAnalytics(app);
+}
+
+// Emuladores solo en localhost
+if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+  // Evita error de "ya conectado" con HMR
+  // @ts-ignore
+  if (!db._settingsFrozen) {
+    console.log("🔧 Conectando a Emuladores Firebase...");
+
+    try {
+      connectFirestoreEmulator(db, "127.0.0.1", 8080);
+      connectAuthEmulator(auth, "http://127.0.0.1:9099");
+      connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+    } catch (e) {
+      console.warn("Emuladores ya conectados o error al conectar.");
+    }
+  }
+}
+
+export default app;
