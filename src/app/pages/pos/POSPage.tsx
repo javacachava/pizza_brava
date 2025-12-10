@@ -1,98 +1,98 @@
-import React, { useState, useMemo } from 'react';
-    import { useMenu } from '../../../hooks/useMenu';
-    import { CategoryTabs } from './components/CategoryTabs';
-    import { ProductGrid } from './components/ProductGrid';
-    import { CartSidebar } from './components/CartSidebar';
-    import { ProductDetailModal } from './components/ProductDetailModal';
-    import type { MenuItem } from '../../../models/MenuItem';
-    import { useAuth } from '../../../hooks/useAuth';
+import React, { createContext, useContext, useState } from 'react';
+import type { OrderItem } from '../../../models/OrderItem';
+import { POSService } from '../../../services/domain/POSService';
+import { useAuth } from '../../../contexts/AuthContext';
 
-export const POSPage: React.FC = () => {
-    const { user, logout } = useAuth();
-    const { categories, isLoading } = useMenu();
+interface POSContextType {
+    cart: OrderItem[];
+    addToCart: (item: OrderItem) => void;
+    removeFromCart: (index: number) => void;
+    updateQuantity: (index: number, delta: number) => void;
+    clearCart: () => void;
+    placeOrder: (customerName: string, type: 'dine-in' | 'takeaway' | 'delivery', extraData?: any) => Promise<string>;
+    total: number;
+    subtotal: number;
+    tax: number;
+    isProcessing: boolean;
+}
+
+const POSContext = createContext<POSContextType | undefined>(undefined);
+const posService = new POSService();
+
+export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
+    const [cart, setCart] = useState<OrderItem[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
     
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
+    const subtotal = cart.reduce((acc, item) => acc + item.totalPrice, 0);
+    const taxRate = 0.00; 
+    const tax = subtotal * taxRate;
+    const total = subtotal + tax;
 
-    const filteredProducts = useMemo(() => {
-        let items: MenuItem[] = [];
-        categories.forEach(cat => {
-            const catItems = cat.items.filter(p => p.isAvailable);
-            items.push(...catItems);
-        });
-
-        if (selectedCategoryId !== 'ALL') {
-            items = items.filter(p => p.categoryId === selectedCategoryId);
-            }
-        if (searchQuery.trim()) {
-            const lowerQ = searchQuery.toLowerCase();
-            items = items.filter(p => p.name.toLowerCase().includes(lowerQ));
-        }
-
-        return items;
-    }, [categories, selectedCategoryId, searchQuery]);
-
-    const handleProductClick = (product: MenuItem) => {
-                        setSelectedProduct(product);
+    const addToCart = (newItem: OrderItem) => {
+        setCart(prev => [...prev, newItem]);
     };
 
-    if (isLoading) {
-        return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem', color: '#718096' }}>Cargando Menú...</div>;
-    }
+    const removeFromCart = (index: number) => {
+        setCart(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updateQuantity = (index: number, delta: number) => {
+        setCart(prev => prev.map((item, i) => {
+            if (i !== index) return item;
+            const newQty = Math.max(1, item.quantity + delta);
+            return {
+                ...item,
+                quantity: newQty,
+                totalPrice: (item.unitPrice * newQty)
+            };
+        }));
+    };
+
+    const clearCart = () => setCart([]);
+
+    const placeOrder = async (customerName: string, type: 'dine-in' | 'takeaway' | 'delivery', extraData?: any) => {
+        if (!user) throw new Error("No hay sesión de usuario activa");
+        
+        setIsProcessing(true);
+        try {
+            const orderId = await posService.createOrder(
+                cart,
+                customerName,
+                type,
+                user.id,
+                extraData?.tableNumber
+            );
+            clearCart();
+            return orderId;
+        } catch (error) {
+            console.error("Error placing order:", error);
+            throw error;
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     return (
-        <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#f7fafc' }}>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e2e8f0' }}>
-                <div style={{ padding: '15px 20px', backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1 }}>
-                        <h2 style={{ margin: 0, color: '#ff6b00' }}>Pizza Brava POS</h2>
-                        <input 
-                            type="text" 
-                            placeholder="🔍 Buscar producto (nombre)..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            style={{ padding: '10px', borderRadius: '20px', border: '1px solid #cbd5e0', width: '300px', outline: 'none' }}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontWeight: 'bold', color: '#4a5568' }}>{user?.name}</span>
-                        <button onClick={logout} style={{ border: '1px solid #fc8181', color: '#fc8181', background: 'white', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Salir</button>
-                        </div>
-                </div>
-
-                <div style={{ padding: '0 20px', backgroundColor: 'white' }}>
-                    <CategoryTabs 
-                        categories={categories} 
-                        selectedId={selectedCategoryId} 
-                        onSelect={setSelectedCategoryId} 
-                    />
-                </div>
-
-                <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: '#f7fafc' }}>
-                    {filteredProducts.length === 0 ? (
-                        <div style={{ textAlign: 'center', marginTop: '50px', color: '#a0aec0' }}>No se encontraron productos.</div>
-                    ) : (
-                        <ProductGrid products={filteredProducts} onProductClick={handleProductClick} />
-                    )}
-                </div>
-            </div>
-
-            <div style={{ width: '400px', backgroundColor: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-2px 0 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
-                <div style={{ padding: '15px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#fffaf0' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#ed8936', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span>📝</span> Orden Actual
-                    </h2>
-                </div>
-                <div style={{ flex: 1, padding: '15px', overflow: 'hidden' }}>
-                    <CartSidebar />
-                </div>
-            </div>
-
-            <ProductDetailModal 
-                product={selectedProduct} 
-                onClose={() => setSelectedProduct(null)} 
-                />
-        </div>
+        <POSContext.Provider value={{ 
+            cart, 
+            addToCart, 
+            removeFromCart, 
+            updateQuantity,
+            clearCart, 
+            placeOrder, 
+            total,
+            subtotal,
+            tax,
+            isProcessing
+        }}>
+            {children}
+        </POSContext.Provider>
     );
+};
+
+export const usePOSContext = () => {
+    const context = useContext(POSContext);
+    if (!context) throw new Error("usePOSContext must be used within POSProvider");
+    return context;
 };
