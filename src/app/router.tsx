@@ -2,7 +2,7 @@ import React from 'react';
 import { createBrowserRouter, Navigate, useRouteError } from 'react-router-dom';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { useAuth } from '../contexts/AuthContext'; // Ajusta la ruta si es necesario
+import { useAuth } from '../contexts/AuthContext';
 
 // Auth Pages
 import { LoginPage } from './components/auth/LoginPage';
@@ -23,22 +23,21 @@ import { RulesManager } from './pages/admin/RulesManager';
 import { POSPage } from './pages/pos/POSPage';
 import { KitchenPage } from './pages/kitchen/KitchenPage';
 
-// Componente: Error Boundary simple
 const ErrorPage = () => {
     const error: any = useRouteError();
     return (
         <div className="h-screen flex flex-col items-center justify-center text-center p-4">
-            <h1 className="text-2xl font-bold text-red-600">Algo salió mal</h1>
-            <p className="text-gray-600">{error.statusText || error.message}</p>
+            <h1 className="text-2xl font-bold text-red-600">Error inesperado</h1>
+            <p className="text-gray-600 mt-2">{error.statusText || error.message}</p>
+            <a href="/" className="mt-4 text-blue-600 hover:underline">Volver al inicio</a>
         </div>
     );
 };
 
-// Componente: Redirección inteligente basada en Rol
+// Componente para redirección inteligente
 const RootRedirect: React.FC = () => {
     const { user, isAuthenticated, loading } = useAuth();
 
-    // 1. Si está cargando la sesión inicial, mostramos spinner
     if (loading) {
         return (
             <div className="h-screen w-full flex items-center justify-center bg-slate-50">
@@ -47,13 +46,11 @@ const RootRedirect: React.FC = () => {
         );
     }
 
-    // 2. Si NO está autenticado, al Login
     if (!isAuthenticated || !user) {
         return <Navigate to="/login" replace />;
     }
     
-    // 3. Redirección por rol (Lógica de Negocio)
-    // Usamos toLowerCase() por seguridad
+    // Normalizamos el rol a minúsculas para evitar errores de tipado
     const role = user.role?.toLowerCase();
 
     switch (role) {
@@ -61,19 +58,11 @@ const RootRedirect: React.FC = () => {
         case 'recepcion': return <Navigate to="/pos" replace />;
         case 'cocina': return <Navigate to="/kitchen" replace />;
         default: 
-            // FALLBACK SEGURO: Si el rol no existe o está mal escrito,
-            // NO redirigimos a login (bucle infinito), mostramos mensaje.
             return (
-                <div className="h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-                    <h1 className="text-xl font-bold text-gray-800">Acceso Restringido</h1>
-                    <p className="text-gray-600 mb-4">
-                        Tu usuario ({user.email}) tiene el rol <span className="font-mono bg-gray-200 px-1 rounded">{user.role}</span>, 
-                        el cual no tiene un panel asignado.
-                    </p>
-                    <button 
-                        onClick={() => window.location.reload()} 
-                        className="text-orange-600 hover:underline"
-                    >
+                <div className="h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+                    <h1 className="text-xl font-bold text-red-600">Rol Desconocido</h1>
+                    <p className="text-gray-600">Tu usuario tiene el rol "{user.role}", que no tiene acceso configurado.</p>
+                    <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-800 text-white rounded">
                         Recargar
                     </button>
                 </div>

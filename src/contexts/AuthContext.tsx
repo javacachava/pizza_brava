@@ -18,40 +18,59 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const authService = container.authService;
   const [user, setUser] = useState<User | null>(null);
   
-  // Principio de Responsabilidad Única:
-  // Este loading solo indica si "estamos verificando la sesión inicial de Firebase".
-  // NO debe usarse para indicar que un botón de login está cargando.
+  // loading: SOLO para la verificación inicial de sesión (F5 o primer acceso)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // 1. Timeout de Seguridad: Si Firebase no responde en 6 seg, liberamos la app.
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("[Auth] Tiempo de espera agotado. Forzando carga.");
+        setLoading(false);
+      }
+    }, 6000);
+
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentUser) => {
-      // No activamos setLoading(true) aquí para evitar parpadeos innecesarios en recargas suaves
       if (currentUser) {
         try {
+          // Intentamos obtener el perfil, pero con un límite de tiempo implícito
+          // Si falla o no existe, logout para limpiar estado.
           const profile = await authService.getUserById(currentUser.uid);
-          if (profile && profile.isActive) {
-            setUser(profile);
-          } else {
-            // Usuario existe en Firebase pero no en BD o inactivo
-            await authService.logout();
-            setUser(null);
+          
+          if (isMounted) {
+            if (profile && profile.isActive) {
+              setUser(profile);
+            } else {
+              // Usuario en Auth pero no en BD o inactivo
+              await authService.logout();
+              setUser(null);
+            }
           }
         } catch (e) {
-          console.error("[Auth] Error validando sesión:", e);
-          setUser(null);
+          console.error("[Auth] Error verificando usuario:", e);
+          if (isMounted) setUser(null);
         }
       } else {
-        setUser(null);
+        if (isMounted) setUser(null);
       }
-      setLoading(false);
+
+      // 2. Liberamos la app (si el timeout no lo hizo ya)
+      if (isMounted) setLoading(false);
+      clearTimeout(safetyTimeout);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
+  }, []); // Dependencias vacías correcto para init único
 
   const login = async (email: string, pass: string) => {
-    // SOLID: No manipulamos el estado global 'loading' aquí.
-    // La UI específica (Login form) debe encargarse de su propio feedback visual.
+    // ⚠️ NO usamos setLoading(true) aquí. 
+    // Evitamos desmontar la app completa durante el login.
     const logged = await authService.login(email, pass);
     setUser(logged);
   };
@@ -64,7 +83,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Bloqueo solo durante la carga INICIAL (Refresh de página)
+  // Spinner Global: Solo bloquea durante la carga INICIAL
   if (loading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
