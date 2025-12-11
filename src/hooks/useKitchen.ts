@@ -11,9 +11,12 @@ export function useKitchen(orderRepo: IOrderRepository) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ============================================
+  // LOAD: Solo carga si el usuario está autenticado
+  // ============================================
   const load = useCallback(async () => {
-    if (!isAuthenticated) return; // 🛑
-
+    if (!isAuthenticated) return;  // 🛑 ESCUDO
+    
     setLoading(true);
     try {
       const pending = await service.getPending();
@@ -23,23 +26,47 @@ export function useKitchen(orderRepo: IOrderRepository) {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, service]);
 
-  const markPreparing = useCallback(async (id: string) => {
-    await service.markPreparing(id);
-    await load();
-  }, [load]);
+  // ============================================
+  // ACCIONES
+  // Todas revalidan el listado con load()
+  // ============================================
+  const markPreparing = useCallback(
+    async (id: string) => {
+      if (!isAuthenticated) return; // 🛑
+      await service.markPreparing(id);
+      await load();
+    },
+    [isAuthenticated, load, service]
+  );
 
-  const markReady = useCallback(async (id: string) => {
-    await service.markReady(id);
-    await load();
-  }, [load]);
+  const markReady = useCallback(
+    async (id: string) => {
+      if (!isAuthenticated) return; // 🛑
+      await service.markReady(id);
+      await load();
+    },
+    [isAuthenticated, load, service]
+  );
 
+  // ============================================
+  // EFECTO: Solo carga cuando el usuario está logueado
+  // ============================================
   useEffect(() => {
     if (isAuthenticated) {
       load();
     }
   }, [isAuthenticated, load]);
 
-  return { orders, loading, refresh: load, markPreparing, markReady };
+  // ============================================
+  // RETORNO
+  // ============================================
+  return {
+    orders,
+    loading,
+    refresh: load,
+    markPreparing,
+    markReady,
+  };
 }

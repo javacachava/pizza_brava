@@ -12,8 +12,11 @@ export function useOrders(orderRepo: IOrderRepository) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ========================================================
+  // LOAD: Cargar órdenes activas solo si hay sesión
+  // ========================================================
   const loadActive = useCallback(async () => {
-    if (!isAuthenticated) return; // 🛑
+    if (!isAuthenticated) return; // 🛑 ESCUDO
 
     setLoading(true);
     try {
@@ -24,17 +27,56 @@ export function useOrders(orderRepo: IOrderRepository) {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, service]);
 
-  const createOrder = useCallback(async (order: Order) => service.createOrder(order), []);
-  const addItem = useCallback(async (id: string, item: OrderItem) => service.addItem(id, item), []);
-  const updateStatus = useCallback(async (id: string, status: Order['status']) => service.updateStatus(id, status), []);
+  // ========================================================
+  // OPERACIONES (todas revalidan)
+  // ========================================================
+  const createOrder = useCallback(
+    async (order: Order) => {
+      if (!isAuthenticated) return; // 🛑
+      await service.createOrder(order);
+      await loadActive();
+    },
+    [isAuthenticated, loadActive, service]
+  );
 
+  const addItem = useCallback(
+    async (id: string, item: OrderItem) => {
+      if (!isAuthenticated) return; // 🛑
+      await service.addItem(id, item);
+      await loadActive();
+    },
+    [isAuthenticated, loadActive, service]
+  );
+
+  const updateStatus = useCallback(
+    async (id: string, status: Order['status']) => {
+      if (!isAuthenticated) return; // 🛑
+      await service.updateStatus(id, status);
+      await loadActive();
+    },
+    [isAuthenticated, loadActive, service]
+  );
+
+  // ========================================================
+  // EFECTO: Cargar únicamente cuando esté logueado
+  // ========================================================
   useEffect(() => {
     if (isAuthenticated) {
       loadActive();
     }
   }, [isAuthenticated, loadActive]);
 
-  return { orders, loading, createOrder, addItem, updateStatus, refresh: loadActive };
+  // ========================================================
+  // RETORNO
+  // ========================================================
+  return {
+    orders,
+    loading,
+    refresh: loadActive,
+    createOrder,
+    addItem,
+    updateStatus,
+  };
 }

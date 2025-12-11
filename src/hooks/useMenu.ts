@@ -1,41 +1,40 @@
 import { useEffect, useState, useCallback } from 'react';
-import type { MenuItem } from '../models/MenuItem';
-import type { Category } from '../models/Category';
+// ... imports ...
+import { useAuthContext } from '../contexts/AuthContext'; // Importar contexto
+import type { MenuItem } from '../models';
+import type { Category } from '../models';
 import type { IMenuRepository } from '../repos/interfaces/IMenuRepository';
 import type { ICategoryRepository } from '../repos/interfaces/ICategoryRepository';
 import { MenuService } from '../services/domain/MenuService';
-import { useAuthContext } from '../contexts/AuthContext'; // Importar Auth
 
 export function useMenu(menuRepo: IMenuRepository, categoryRepo: ICategoryRepository) {
   const menuService = new MenuService(menuRepo, categoryRepo);
-  const { isAuthenticated } = useAuthContext(); // Obtener estado de auth
+  const { isAuthenticated } = useAuthContext(); // Obtener estado
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!isAuthenticated) return; // 🛑 Bloqueo si no hay usuario
+    // 🛑 ESCUDO: Si no hay usuario, no hacemos nada.
+    if (!isAuthenticated) return;
 
     setLoading(true);
     try {
       const itemsList = await menuService.getMenu();
       const categoriesList = await menuService.getCategories();
-
       setItems(itemsList);
       setCategories(categoriesList);
     } catch (e) {
-      console.error("Error loading menu:", e);
+      console.error("Error cargando menú:", e);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]); // Dependencia agregada
+  }, [isAuthenticated]); // Dependencia clave
 
   useEffect(() => {
     if (isAuthenticated) {
-      load();
+        load();
     }
-  }, [isAuthenticated, load]);
-
-  return { items, categories, loading, refresh: load };
+  }, [isAuthenticated, load]); // Solo carga cuando cambia
 }

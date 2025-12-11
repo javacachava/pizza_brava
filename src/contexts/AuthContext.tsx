@@ -17,11 +17,13 @@ const AuthContext = createContext<AuthContextValue>({} as any);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const authService = container.authService;
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true); // 🔒 Empezamos bloqueados
+  
+  // 🔴 CORRECCIÓN CRÍTICA: Empezamos en TRUE para bloquear renderizados prematuros
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentUser) => {
-      // setLoading(true); // No es necesario re-activarlo aquí para evitar parpadeos
+      // setLoading(true); // No reiniciamos loading aquí para evitar parpadeos
       if (currentUser) {
         try {
           const profile = await authService.getUserById(currentUser.uid);
@@ -32,13 +34,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(null);
           }
         } catch (e) {
-          console.error("Error validando sesión:", e);
+          console.error("Error sesión:", e);
           setUser(null);
         }
       } else {
         setUser(null);
       }
-      setLoading(false); // 🔓 Liberamos la app cuando ya sabemos qué pasó
+      // ✅ Solo liberamos la app cuando estamos 100% seguros
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -61,26 +64,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(false);
   };
 
-  // 🛑 EL CAMBIO CLAVE:
-  // Si está cargando, mostramos un spinner global y NO renderizamos los hijos.
-  // Esto previene que los Hooks de Menu/Orders intenten leer DB sin permiso.
+  // 🛡️ Muro de contención: Si está cargando, NO renderiza la App (ni los errores)
   if (loading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
         <div className="animate-spin h-10 w-10 border-4 border-orange-500 border-t-transparent rounded-full"></div>
-        <p className="mt-4 text-slate-500 font-medium animate-pulse">Iniciando Pizza Brava...</p>
+        <p className="mt-4 text-slate-500 font-medium animate-pulse">Cargando sistema...</p>
       </div>
     );
   }
 
   return (
-    <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, loading, login, logout }}
-    >
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuthContext = () => useContext(AuthContext);
-export const useAuth = useAuthContext; // Alias compatible
+export const useAuth = useAuthContext;
