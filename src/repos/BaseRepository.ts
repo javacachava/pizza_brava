@@ -1,54 +1,87 @@
 import {
-    collection,
-    getDocs,
-    doc,
-    getDoc,
-    addDoc,
-    updateDoc,
-    deleteDoc
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  type DocumentData,
+  CollectionReference
 } from 'firebase/firestore';
 
-import type { DocumentData } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
-export abstract class BaseRepository<T> {
-    protected collectionName: string;
+export abstract class BaseRepository<T extends { id?: string }> {
+  protected collRef: CollectionReference<DocumentData>;
+  protected collectionPath: string;
 
-    constructor(collectionName: string) {
-        this.collectionName = collectionName;
+  constructor(collectionPath: string) {
+    this.collectionPath = collectionPath;
+    this.collRef = collection(db, collectionPath);
+  }
+
+  async create(entity: T): Promise<T> {
+    const data = { ...entity };
+
+    if (entity.id) {
+      const ref = doc(this.collRef, entity.id);
+      await setDoc(ref, data, { merge: true });
+      return { ...(data as any) } as T;
     }
 
-    protected getCollection() {
-        return collection(db, this.collectionName);
-    }
+    const res = await addDoc(this.collRef, data);
+    return { ...(data as any), id: res.id } as T;
+  }
 
-    async getAll(): Promise<T[]> {
-        const colRef = this.getCollection();
-        const snapshot = await getDocs(colRef);
-        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as unknown as T));
-    }
+  async getById(id: string): Promise<T | null> {
+    const ref = doc(this.collRef, id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return { ...(snap.data() as T), id: snap.id };
+  }
 
-    async getById(id: string): Promise<T | null> {
-        const docRef = doc(db, this.collectionName, id);
-        const snapshot = await getDoc(docRef);
-        return snapshot.exists()
-            ? ({ id: snapshot.id, ...snapshot.data() } as unknown as T)
-            : null;
-    }
+  async update(id: string, partial: Partial<T>): Promise<void> {
+    const ref = doc(this.collRef, id);
+    await updateDoc(ref, partial as any);
+  }
 
-    async create(data: Omit<T, 'id'>): Promise<string> {
-        const colRef = this.getCollection();
-        const docRef = await addDoc(colRef, data as DocumentData);
-        return docRef.id;
-    }
+  async delete(id: string): Promise<void> {
+    const ref = doc(this.collRef, id);
+    await deleteDoc(ref);
+  }
 
-    async update(id: string, data: Partial<T>): Promise<void> {
-        const docRef = doc(db, this.collectionName, id);
-        await updateDoc(docRef, data as DocumentData);
+  async getAll(limitCount?: number): Promise<T[]> {
+    let q = query(this.collRef);
+    if (limitCount && limitCount > 0) {
+      q = query(this.collRef, limit(limitCount));
     }
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...(d.data() as T), id: d.id }));
+  }
 
-    async delete(id: string): Promise<void> {
-        const docRef = doc(db, this.collectionName, id);
-        await deleteDoc(docRef);
-    }
+  async getAllOrdered(orderField = 'order', direction: 'asc' | 'desc' = 'asc'): Promise<T[]> {
+    const q = query(this.collRef, orderBy(orderField, direction));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...(d.data() as T), id: d.id }));
+  }
+
+  async getByField(field: string, value: any): Promise<T[]> {
+    const q = query(this.collRef, where(field, '==', value));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...(d.data() as T), id: d.id }));
+  }
+
+  onSnapshot(callback: (items: T[]) => void) {
+    return onSnapshot(this.collRef, snap => {
+      const items = snap.docs.map(d => ({ ...(d.data() as T), id: d.id }));
+      callback(items);
+    });
+  }
 }

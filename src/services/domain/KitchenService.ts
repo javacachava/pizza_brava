@@ -1,18 +1,22 @@
-import { OrdersRepository } from '../../repos/OrdersRepository';
-import type { Order, OrderStatus } from '../../models/Order';
+import type { IOrderRepository } from '../../repos/interfaces/IOrderRepository';
+import type { Order } from '../../models/Order';
 
 export class KitchenService {
-    private ordersRepo: OrdersRepository;
+  private orders: IOrderRepository;
 
-    constructor() {
-        this.ordersRepo = new OrdersRepository();
-    }
+  constructor(orders: IOrderRepository) {
+    this.orders = orders;
+  }
 
-    subscribeToOrders(onUpdate: (orders: Order[]) => void): () => void {
-        return this.ordersRepo.subscribeToActiveOrders(onUpdate);
-    }
+  async getPending(): Promise<Order[]> {
+    return this.orders.getByStatus(['pendiente', 'preparando']);
+  }
 
-    async updateStatus(orderId: string, status: OrderStatus): Promise<void> {
-        await this.ordersRepo.updateStatus(orderId, status);
-    }
+  async markPreparing(id: string) {
+    return this.orders.update(id, { status: 'preparando' });
+  }
+
+  async markReady(id: string) {
+    return this.orders.update(id, { status: 'listo' });
+  }
 }

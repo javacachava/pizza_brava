@@ -1,6 +1,10 @@
+import type { ID, Timestamp } from './SharedTypes';
+
 export interface Accompaniment {
-  id: string;
+  id: ID;
   name: string;
-  price: number;
-  isActive?: boolean;
+  price?: number;
+  isAvailable?: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }

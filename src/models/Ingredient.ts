@@ -1,8 +1,12 @@
+import type { ID, Timestamp } from './SharedTypes';
+
 export interface Ingredient {
-    id: string;
-    name: string;
-    price: number; 
-    isAvailable: boolean;
-    unit: 'g' | 'ml' | 'unit';
-    stock?: number;
+  id: ID;
+  name: string;
+  price?: number;
+  unit?: string; // ej. 'unit', 'g', 'ml'
+  stock?: number;
+  isAvailable?: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }

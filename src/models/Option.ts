@@ -1,7 +1,11 @@
+import type { ID, Timestamp } from './SharedTypes';
+
 export interface Option {
-    id: string;
-    name: string;
-    priceModifier: number;
-    isAvailable: boolean;
-    groupId: string; 
+  id: ID;
+  name: string;
+  description?: string;
+  price?: number;
+  isActive?: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }

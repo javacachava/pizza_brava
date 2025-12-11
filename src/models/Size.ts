@@ -1,7 +1,11 @@
+import type { ID, Timestamp } from './SharedTypes';
+
 export interface Size {
-  id: string;
+  id: ID;
   name: string;
-  multiplier: number;
-  isActive?: boolean;
+  multiplier: number; // ej. 1, 1.5, 2
   order?: number;
+  isActive?: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }

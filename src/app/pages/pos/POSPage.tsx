@@ -1,93 +1,296 @@
-import React, { useState, useMemo } from 'react';
-import { useMenu } from '../../../hooks/useMenu';
-import { useAuth } from '../../../hooks/useAuth';
-import { CategoryTabs } from './components/CategoryTabs';
-import { ProductGrid } from './components/ProductGrid';
-import { CartSidebar } from './components/CartSidebar';
-import { ProductDetailModal } from './components/ProductDetailModal';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useMenuContext } from '../../../contexts/MenuContext';
+import { usePOSContext } from '../../../contexts/POSContext';
+import { useOrderContext } from '../../../contexts/providers/OrderProvider';
+import { container } from '../../../models/di/container';
+
+import { ProductGrid } from './ProductGrid';
+import { ProductDetailModal } from './ProductDetailModal';
+import { CategoryTabs } from './CategoryTabs';
+import { CartSidebar } from './CartSidebar';
+import { ComboSelectionModal } from './ComboSelectionModal';
+import { OrderTypeModal } from './OrderTypeModal';
+
 import type { MenuItem } from '../../../models/MenuItem';
+import type { ComboDefinition } from '../../../models/ComboDefinition';
+import type { OrderItem } from '../../../models/OrderItem';
+import type { OrderType } from '../../../models/Order';
+
+import { formatPrice } from '../../../utils/format';
+import { calculateCartTotal } from '../../../utils/pos';
+import { generateSafeId } from '../../../utils/id';
 
 export const POSPage: React.FC = () => {
-    const { user, logout } = useAuth();
-    const { categories, isLoading } = useMenu();
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
+  const {
+    items: menuItems,
+    categories,
+    loading: menuLoading,
+    refresh: refreshMenu
+  } = useMenuContext();
 
-    const filteredProducts = useMemo(() => {
-        let items: MenuItem[] = [];
-        categories.forEach(cat => {
-            const catItems = cat.items.filter(p => p.isAvailable);
-            items.push(...catItems);
-        });
-        if (selectedCategoryId !== 'ALL') items = items.filter(p => p.categoryId === selectedCategoryId);
-        if (searchQuery.trim()) items = items.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        return items;
-    }, [categories, selectedCategoryId, searchQuery]);
+  const {
+    cart,
+    addProduct,
+    addOrderItem,
+    removeIndex,
+    clear
+  } = usePOSContext();
 
-    if (isLoading) return <div className="h-screen flex items-center justify-center text-slate-400">Cargando Sistema...</div>;
+  const { createOrder, refresh: refreshOrders } = useOrderContext();
 
-    return (
-        <div className="flex h-screen overflow-hidden bg-slate-50">
-            {/* IZQUIERDA: Catálogo */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* Header */}
-                <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-10">
-                    <div className="flex items-center gap-6 flex-1">
-                        <h2 className="text-xl font-bold text-slate-800 tracking-tight">Punto de Venta</h2>
-                        <div className="relative flex-1 max-w-md">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
-                            <input 
-                                type="text" 
-                                className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-none rounded-full text-sm focus:ring-2 focus:ring-orange-500/20 transition-all"
-                                placeholder="Buscar producto..."
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right hidden sm:block">
-                            <div className="text-sm font-bold text-slate-700">{user?.name}</div>
-                            <div className="text-xs text-slate-500 uppercase">{user?.role}</div>
-                        </div>
-                        <button onClick={logout} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors" title="Salir">
-                            🚪
-                        </button>
-                    </div>
-                </header>
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-                {/* Contenido Principal */}
-                <main className="flex-1 flex flex-col overflow-hidden relative">
-                    <div className="px-6 pt-4 bg-white border-b border-slate-100">
-                        <CategoryTabs categories={categories} selectedId={selectedCategoryId} onSelect={setSelectedCategoryId} />
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
-                        {filteredProducts.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                                <span className="text-4xl mb-2">🍽️</span>
-                                <p>No se encontraron productos</p>
-                            </div>
-                        ) : (
-                            <ProductGrid products={filteredProducts} onProductClick={setSelectedProduct} />
-                        )}
-                    </div>
-                </main>
-            </div>
+  const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
+  const [isProductModalOpen, setProductModalOpen] = useState(false);
 
-            {/* DERECHA: Carrito */}
-            <aside className="w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-xl z-20">
-                <div className="p-5 border-b border-slate-100 bg-slate-50/50 backdrop-blur">
-                    <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                        <span>🛒</span> Orden Actual
-                    </h3>
-                </div>
-                <div className="flex-1 overflow-hidden relative">
-                    <CartSidebar />
-                </div>
-            </aside>
+  const [comboDefinitions, setComboDefinitions] = useState<ComboDefinition[]>([]);
+  const [selectedComboDef, setSelectedComboDef] = useState<ComboDefinition | null>(null);
+  const [isComboModalOpen, setComboModalOpen] = useState(false);
 
-            <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
-        </div>
+  const [isOrderTypeOpen, setOrderTypeOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Cargar definiciones de combo
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const defs = await container.comboService.getDefinitions();
+        if (mounted) setComboDefinitions(defs);
+      } catch (err) {
+        console.error('Error cargando definiciones de combo', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Productos filtrados
+  const displayed: MenuItem[] = useMemo(() => {
+    if (!activeCategory) return menuItems;
+    return menuItems.filter((i: MenuItem) => i.categoryId === activeCategory);
+  }, [menuItems, activeCategory]);
+
+  const handleProductClick = (p: MenuItem) => {
+    setSelectedProduct(p);
+    setProductModalOpen(true);
+  };
+
+  const handleAddProduct = (qty: number) => {
+    if (!selectedProduct) return;
+    addProduct(selectedProduct, qty, 0);
+    setProductModalOpen(false);
+  };
+
+  // ✔️ NUEVA VERSIÓN PROFESIONAL — crear OrderItem completo para combos
+  const handleConfirmCombo = (selections: Record<string, string[]>) => {
+    if (!selectedComboDef) return;
+
+    const comboInstance = container.comboService.generateCombo(
+      selectedComboDef,
+      selections
     );
+
+    const comboOrderItem: OrderItem = {
+      productId: comboInstance.id,
+      productName: comboInstance.name + ' (Combo)',
+      quantity: 1,
+      unitPrice: comboInstance.price,
+      totalPrice: comboInstance.price,
+      isCombo: true,
+      combo: comboInstance,
+      selectedOptions: [] // ← CORRECTO (era {} y fallaba)
+    };
+
+    addOrderItem(comboOrderItem);
+
+    setComboModalOpen(false);
+    setSelectedComboDef(null);
+  };
+
+  const handleOpenOrderType = () => {
+    if (cart.length === 0) {
+      alert('El carrito está vacío.');
+      return;
+    }
+    setOrderTypeOpen(true);
+  };
+
+  const handleSubmitOrder = async (type: OrderType) => {
+    setSubmitting(true);
+    try {
+      const items = cart.map((ci: OrderItem) => ({
+        productId: ci.productId ?? generateSafeId(),
+        productName: ci.productName,
+        quantity: ci.quantity,
+        unitPrice: ci.unitPrice,
+        totalPrice: ci.totalPrice,
+        comment: ci.comment,
+        selectedOptions: ci.selectedOptions,
+        isCombo: ci.isCombo ?? false,
+        combo: ci.combo ?? null
+      }));
+
+      const total = calculateCartTotal(items);
+
+      const orderPayload = {
+        id: generateSafeId(),
+        items,
+        total,
+        orderType: type,
+        status: 'pending',
+        createdAt: Date.now()
+      };
+
+      await createOrder(orderPayload);
+      clear();
+      setOrderTypeOpen(false);
+      alert('Orden creada correctamente');
+      refreshOrders();
+    } catch (err) {
+      console.error(err);
+      alert('Error creando orden');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleIncrease = (productId?: string | null) => {
+    if (!productId) return;
+
+    const item = cart.find((c: OrderItem) => c.productId === productId);
+    if (!item) return;
+
+    if (!item.isCombo) {
+      const product = menuItems.find((mi: MenuItem) => mi.id === productId);
+      if (product) {
+        addProduct(product, 1, 0);
+        return;
+      }
+    }
+
+    addOrderItem({
+      ...item,
+      quantity: item.quantity + 1,
+      totalPrice: item.unitPrice * (item.quantity + 1)
+    });
+  };
+
+  const handleDecrease = (productId?: string | null) => {
+    if (!productId) return;
+    const idx = cart.findIndex((c: OrderItem) => c.productId === productId);
+    if (idx >= 0) removeIndex(idx);
+  };
+
+  const handleRemove = (productId?: string | null) => {
+    if (!productId) return;
+    let idx = cart.findIndex((c: OrderItem) => c.productId === productId);
+    while (idx >= 0) {
+      removeIndex(idx);
+      idx = cart.findIndex((c: OrderItem) => c.productId === productId);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex">
+      <main className="flex-1 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Punto de Venta</h1>
+            <p className="text-sm text-gray-600">Selecciona productos para comenzar la orden</p>
+          </div>
+
+          <div className="text-right">
+            <div className="text-sm text-gray-600">Items: {cart.length}</div>
+            <div className="text-lg font-semibold">
+              {formatPrice(calculateCartTotal(cart))}
+            </div>
+          </div>
+        </div>
+
+        <CategoryTabs
+          categories={categories}
+          active={activeCategory}
+          onChange={setActiveCategory}
+        />
+
+        <div className="mt-4">
+          <div className="flex justify-end gap-2 mb-2">
+            <select
+              value={activeCategory ?? ''}
+              onChange={e => setActiveCategory(e.target.value || null)}
+              className="input-field"
+            >
+              <option value="">Filtrar por categoría</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+
+            <button className="px-3 py-2 border rounded" onClick={() => refreshMenu()}>
+              Actualizar menú
+            </button>
+          </div>
+
+          <ProductGrid
+            products={displayed}
+            onProductClick={handleProductClick}
+          />
+        </div>
+      </main>
+
+      <CartSidebar
+        cart={cart}
+        onIncrease={handleIncrease}
+        onDecrease={handleDecrease}
+        onRemove={handleRemove}
+        onSubmitOrder={handleOpenOrderType}
+      />
+
+      {isProductModalOpen && selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          onClose={() => { setProductModalOpen(false); setSelectedProduct(null); }}
+          onAdd={handleAddProduct}
+        />
+      )}
+
+      {isComboModalOpen && selectedComboDef && (
+        <ComboSelectionModal
+          definition={selectedComboDef}
+          menu={menuItems.reduce<Record<string, string>>(
+            (acc, mi: MenuItem) => {
+              acc[mi.id] = mi.name;
+              return acc;
+            },
+            {}
+          )}
+          onClose={() => { setComboModalOpen(false); setSelectedComboDef(null); }}
+          onConfirm={handleConfirmCombo}
+        />
+      )}
+
+      {isOrderTypeOpen && (
+        <OrderTypeModal
+          open={isOrderTypeOpen}
+          onClose={() => setOrderTypeOpen(false)}
+          onSelect={(t: OrderType) => handleSubmitOrder(t)}
+        />
+      )}
+
+      <div style={{ position: 'fixed', bottom: 16, left: 16 }}>
+        {comboDefinitions.map((cd: ComboDefinition) => (
+          <button
+            key={cd.id}
+            onClick={() => {
+              setSelectedComboDef(cd);
+              setComboModalOpen(true);
+            }}
+            className="mr-2 px-3 py-2 bg-gray-100 rounded"
+          >
+            Combo: {cd.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 };

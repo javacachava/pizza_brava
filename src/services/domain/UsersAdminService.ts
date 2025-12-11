@@ -1,34 +1,30 @@
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
-import { UsersRepository } from '../../repos/UsersRepository';
+import type { IUserRepository } from '../../repos/interfaces/IUserRepository';
 import type { User, UserRole } from '../../models/User';
 
 export class UsersAdminService {
-    private usersRepo: UsersRepository;
+  private users: IUserRepository;
 
-    constructor() {
-        this.usersRepo = new UsersRepository();
-    }
+  constructor(users: IUserRepository) {
+    this.users = users;
+  }
 
-    async getAllUsers(): Promise<User[]> {
-        return await this.usersRepo.getAll();
-    }
+  async getAllUsers(): Promise<User[]> {
+    return this.users.getAll();
+  }
 
-    async createUser(data: { email: string; password: string; name: string; role: UserRole }): Promise<void> {
-        try {
-            const createUserFunction = httpsCallable(functions, 'createUser');
-            await createUserFunction(data);
-        } catch (error: any) {
-            console.error("Error creating user:", error);
-            throw new Error(error.message || "Error al crear usuario.");
-        }
-    }
+  async createUser(data: {
+    email: string;
+    password: string;
+    name: string;
+    role: UserRole;
+  }) {
+    if (!data.email || !data.password || !data.name)
+      throw new Error('Todos los campos son obligatorios');
 
-    async updateUser(id: string, data: Partial<User>): Promise<void> {
-        await this.usersRepo.update(id, data);
-    }
+    return this.users.create(data);
+  }
 
-    async toggleUserStatus(user: User): Promise<void> {
-        await this.usersRepo.update(user.id, { isActive: !user.isActive });
-    }
+  async toggleUserStatus(user: User) {
+    return this.users.update(user.id, { isActive: !user.isActive });
+  }
 }

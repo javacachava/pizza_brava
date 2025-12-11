@@ -1,65 +1,19 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
+import { useAdmin } from '../hooks/useAdmin';
+import type { ISystemSettingsRepository } from '../repos/interfaces/ISystemSettingsRepository';
+import type { IRulesRepository } from '../repos/interfaces/IRulesRepository';
 
-interface Notification {
-    type: 'success' | 'error' | 'info';
-    message: string;
+interface AdminProviderProps {
+  settingsRepo: ISystemSettingsRepository;
+  rulesRepo: IRulesRepository;
+  children: ReactNode;
 }
 
-interface AdminContextType {
-    isLoading: boolean;
-    setLoading: (loading: boolean) => void;
-    notification: Notification | null;
-    showNotification: (type: 'success' | 'error' | 'info', message: string) => void;
-    clearNotification: () => void;
-}
+const AdminContext = createContext<any>(null);
 
-const AdminContext = createContext<AdminContextType | undefined>(undefined);
-
-export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [isLoading, setLoading] = useState(false);
-    const [notification, setNotification] = useState<Notification | null>(null);
-
-    const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
-        setNotification({ type, message });
-        setTimeout(() => setNotification(null), 3000);
-    }, []);
-
-    const clearNotification = useCallback(() => setNotification(null), []);
-
-    return (
-        <AdminContext.Provider value={{ 
-            isLoading, 
-            setLoading, 
-            notification, 
-            showNotification, 
-            clearNotification 
-        }}>
-            {children}
-            
-            {notification && (
-                <div style={{
-                    position: 'fixed',
-                    bottom: '20px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: notification.type === 'error' ? '#c53030' : notification.type === 'success' ? '#2f855a' : '#2b6cb0',
-                    color: 'white',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
-                    zIndex: 9999,
-                    fontWeight: 'bold',
-                    transition: 'all 0.3s ease'
-                }}>
-                    {notification.message}
-                </div>
-            )}
-        </AdminContext.Provider>
-    );
+export const AdminProvider = ({ settingsRepo, rulesRepo, children }: AdminProviderProps) => {
+  const state = useAdmin(settingsRepo, rulesRepo);
+  return <AdminContext.Provider value={state}>{children}</AdminContext.Provider>;
 };
 
-export const useAdmin = () => {
-    const context = useContext(AdminContext);
-    if (!context) throw new Error("useAdmin must be used within AdminProvider");
-    return context;
-};
+export const useAdminContext = () => useContext(AdminContext);

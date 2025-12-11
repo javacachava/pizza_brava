@@ -1,24 +1,37 @@
-import { useEffect, useState } from 'react';
-import { OrdersRepository } from '../repos/OrdersRepository';
+import { useEffect, useState, useCallback } from 'react';
 import type { Order } from '../models/Order';
+import type { IOrderRepository } from '../repos/interfaces/IOrderRepository';
+import { KitchenService } from '../services/domain/KitchenService';
 
-export const useKitchen = () => {
-    const repo = new OrdersRepository();
-    const [orders, setOrders] = useState<Order[]>([]);
+export function useKitchen(orderRepo: IOrderRepository) {
+  const service = new KitchenService(orderRepo);
 
-    const refreshQueue = async () => {
-        const all = await repo.getAll();
-        setOrders(all.filter(o => o.status !== 'delivered'));
-    };
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
 
-    const updateOrderStatus = async (id: string, status: Order['status']) => {
-        await repo.update(id, { status });
-        await refreshQueue();
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const pending = await service.getPending();
+      setOrders(pending);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    useEffect(() => {
-        refreshQueue();
-    }, []);
+  const markPreparing = useCallback(async (id: string) => {
+    await service.markPreparing(id);
+    await load();
+  }, []);
 
-    return { orders, refreshQueue, updateOrderStatus };
-};
+  const markReady = useCallback(async (id: string) => {
+    await service.markReady(id);
+    await load();
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return { orders, loading, refresh: load, markPreparing, markReady };
+}

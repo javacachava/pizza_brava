@@ -1,32 +1,26 @@
-import { MenuRepository } from '../../repos/MenuRepository';
+import type { IMenuRepository } from '../../repos/interfaces/IMenuRepository';
 import type { MenuItem } from '../../models/MenuItem';
-import { FlavorsRepository } from '../../repos/FlavorsRepository';
-import { SizesRepository } from '../../repos/SizesRepository';
-import { CombosRepository } from '../../repos/CombosRepository';
 
 export class ProductsAdminService {
-  private repo = new MenuRepository();
-  private flavorsRepo = new FlavorsRepository();
-  private sizesRepo = new SizesRepository();
-  private combosRepo = new CombosRepository();
+  private menuRepo: IMenuRepository;
 
-  async listProducts(): Promise<MenuItem[]> {
-    return this.repo.getAll();
+  constructor(menuRepo: IMenuRepository) {
+    this.menuRepo = menuRepo;
   }
 
-  async createProduct(data: Omit<MenuItem, 'id'>) {
-    return this.repo.create(data);
+  async getAll(): Promise<MenuItem[]> {
+    return this.menuRepo.getAll();
   }
 
-  async updateProduct(id: string, data: Partial<MenuItem>) {
-    return this.repo.update(id, data);
-  }
+  async save(product: Partial<MenuItem>) {
+    if (!product.name || !product.price || !product.categoryId) {
+      throw new Error('Nombre, precio y categoría obligatorios');
+    }
 
-  async deleteProduct(id: string) {
-    return this.repo.delete(id);
-  }
+    if (product.id) {
+      return this.menuRepo.update(product.id, product);
+    }
 
-  async listFlavors() { return this.flavorsRepo.getAllOrdered(); }
-  async listSizes() { return this.sizesRepo.getAllOrdered(); }
-  async listCombos() { return this.combosRepo.getAll(); }
+    return this.menuRepo.create(product as MenuItem);
+  }
 }

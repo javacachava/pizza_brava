@@ -1,6 +1,10 @@
+import type { ID, Timestamp } from './SharedTypes';
+
 export interface Flavor {
-  id: string;
+  id: ID;
   name: string;
-  isActive?: boolean;
   order?: number;
+  isActive?: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }

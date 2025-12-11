@@ -1,12 +1,17 @@
+import type { ID, Timestamp } from './SharedTypes';
+
 export interface MenuItem {
-    id: string;
-    categoryId: string;
-    name: string;
-    description?: string;
-    price: number;
-    isAvailable: boolean; // REGLA: Campo correcto para disponibilidad
-    usesIngredients: boolean;
-    usesFlavors: boolean;
-    usesSizeVariant: boolean;
-    comboEligible: boolean;
+  id: ID;
+  categoryId: ID;
+  name: string;
+  description?: string;
+  price: number;
+  isAvailable?: boolean;
+  usesIngredients?: boolean;
+  usesFlavors?: boolean;
+  usesSizeVariant?: boolean;
+  comboEligible?: boolean;
+  imageUrl?: string | null;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }

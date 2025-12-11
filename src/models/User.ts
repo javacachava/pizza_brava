@@ -1,9 +1,15 @@
-export type UserRole = 'admin' | 'cocina' | 'recepcion';
+import type { ID, Timestamp } from './SharedTypes';
+
+export type UserRole = 'admin' | 'recepcion' | 'cocina';
 
 export interface User {
-    id: string; // ID de Firestore
-    email: string;
-    name: string;
-    role: UserRole;
-    active: boolean; // REGLA: Usar 'active', no 'status' ni 'isActive'
+  id: ID;
+  email: string;
+  name: string;
+  role: UserRole;
+  isActive?: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  // campos opcionales de auth provider
+  providerId?: string | null;
 }

@@ -1,64 +1,48 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import type { User } from '../models/User';
-import { AuthService } from '../services/auth/AuthService';
+import { container } from '../models/di/container';
 
-interface AuthContextType {
-    user: User | null;
-    loading: boolean;
-    login: (email: string, pass: string) => Promise<void>;
-    logout: () => Promise<void>;
-    isAuthenticated: boolean;
+interface AuthContextValue {
+  user: User | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (email: string, pass: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const authService = new AuthService();
+const AuthContext = createContext<AuthContextValue>({} as any);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const authService = container.authService;
 
-    useEffect(() => {
-        const unsubscribe = authService.onAuthStateChange((fetchedUser) => {
-            setUser(fetchedUser);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
 
-    const login = async (email: string, pass: string) => {
-        setLoading(true);
-        try {
-            const loggedUser = await authService.login(email, pass);
-            setUser(loggedUser);
-        } catch (error) {
-            throw error;
-        } finally {
-            setLoading(false);
-        }
-    };
+  const login = async (email: string, pass: string) => {
+    setLoading(true);
+    const logged = await authService.login(email, pass);
+    setUser(logged);
+    setLoading(false);
+  };
 
-    const logout = async () => {
-        setLoading(true);
-        await authService.logout();
-        setUser(null);
-        setLoading(false);
-    };
+  const logout = async () => {
+    setUser(null);
+  };
 
-    return (
-        <AuthContext.Provider value={{ 
-            user, 
-            loading, 
-            login, 
-            logout,
-            isAuthenticated: !!user 
-        }}>
-            {children}
-        </AuthContext.Provider>
-    );
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        loading,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) throw new Error("useAuth must be used within AuthProvider");
-    return context;
-};
+export const useAuthContext = () => useContext(AuthContext);
+export const useAuth = useAuthContext;

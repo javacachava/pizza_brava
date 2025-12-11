@@ -1,27 +1,29 @@
-import { useState, useEffect } from 'react';
-import { POSService } from '../services/domain/POSService';
+import { useEffect, useState, useCallback } from 'react';
 import type { Table } from '../models/Table';
+import type { ITableRepository } from '../repos/interfaces/ITableRepository';
 
-const posService = new POSService();
+export function useTables(repo: ITableRepository) {
+  const [tables, setTables] = useState<Table[]>([]);
+  const [loading, setLoading] = useState(false);
 
-export const useTables = () => {
-    const [tables, setTables] = useState<Table[]>([]);
-    const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await repo.getAll();
+      setTables(list);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    useEffect(() => {
-        const fetchTables = async () => {
-            try {
-                const data = await posService.getTables();
-                setTables(data);
-            } catch (error) {
-                console.error("Error cargando mesas:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+  const update = useCallback(async (id: string, data: Partial<Table>) => {
+    await repo.update(id, data);
+    await load();
+  }, []);
 
-        fetchTables();
-    }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-    return { tables, loading };
-};
+  return { tables, loading, update, refresh: load };
+}

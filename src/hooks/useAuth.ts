@@ -1,42 +1,28 @@
-import { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { UsersRepository } from '../repos/UsersRepository';
+import { useState, useCallback } from 'react';
+import { AuthService } from '../services/auth/AuthService';
 import type { User } from '../models/User';
+import type { IUserRepository } from '../repos/interfaces/IUserRepository';
 
-export const useAuth = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+export function useAuth(usersRepo: IUserRepository) {
+  const authService = new AuthService(usersRepo);
 
-    const auth = getAuth();
-    const userRepo = new UsersRepository();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                const dbUser = await userRepo.getByEmail(firebaseUser.email || '');
+  const login = useCallback(async (email: string, password: string) => {
+    setLoading(true);
+    try {
+      const u = await authService.login(email, password);
+      setUser(u);
+      return u;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-                if (dbUser) {
-                    setUser(dbUser);
-                } else {
-                    setUser({
-                        id: firebaseUser.uid,
-                        email: firebaseUser.email || '',
-                        name: firebaseUser.displayName || 'User',
-                        role: 'waiter',
-                        isActive: true
-                    });
-                }
-            } else {
-                setUser(null);
-            }
+  const logout = useCallback(() => {
+    setUser(null);
+  }, []);
 
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, []);
-
-    const logout = () => signOut(auth);
-
-    return { user, loading, logout };
-};
+  return { user, loading, login, logout };
+}

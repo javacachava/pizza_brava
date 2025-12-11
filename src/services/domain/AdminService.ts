@@ -1,28 +1,35 @@
-import { CashFlowRepository } from "../../repos/CashFlowRepository";
-import { OrdersRepository } from "../../repos/OrdersRepository";
-import type { CashCut, Expense, ExpenseCategory } from "../../models/CashFlow";
+import type { ISystemSettingsRepository } from '../../repos/interfaces/ISystemSettingsRepository';
+import type { IRulesRepository } from '../../repos/interfaces/IRulesRepository';
+import type { SystemSettings } from '../../models/SystemSettings';
+import type { Rule } from '../../models/Rules';
 
 export class AdminService {
-    private cashRepo = new CashFlowRepository();
-    private ordersRepo = new OrdersRepository();
+  private settingsRepo: ISystemSettingsRepository;
+  private rulesRepo: IRulesRepository;
 
-    // Obtener categorías para el dropdown de "Retiro de Dinero"
-    async getExpenseCategories(): Promise<ExpenseCategory[]> {
-        return await this.cashRepo.getExpenseCategories();
-    }
+  constructor(
+    settingsRepo: ISystemSettingsRepository,
+    rulesRepo: IRulesRepository
+  ) {
+    this.settingsRepo = settingsRepo;
+    this.rulesRepo = rulesRepo;
+  }
 
-    // Calcular totales del día (Ventas reales desde Pedidos)
-    async getDailyTotals(date: Date) {
-        // Aquí conectamos con OrdersRepository para sumar ventas del día
-        // Nota: Asegúrate que OrdersRepository tenga un método getOrdersByDate o similar
-        // Por ahora simulamos la suma lógica o implementamos getDailySales() en OrdersRepo
-        return {
-            totalSales: 0, // Implementar lógica real de suma
-            orderCount: 0
-        };
-    }
+  async getSettings(): Promise<SystemSettings> {
+    return this.settingsRepo.getSettings();
+  }
 
-    async closeDay(cut: CashCut): Promise<string> {
-        return await this.cashRepo.saveCashCut(cut);
-    }
+  async updateSettings(data: Partial<SystemSettings>) {
+    return this.settingsRepo.updateSettings(data);
+  }
+
+  async getRules(): Promise<Rule[]> {
+    return this.rulesRepo.getAll();
+  }
+
+  async saveRule(data: Partial<Rule>) {
+    if (!data.key) throw new Error('La regla requiere una clave');
+    if (data.id) return this.rulesRepo.update(data.id, data);
+    return this.rulesRepo.create(data as Rule);
+  }
 }

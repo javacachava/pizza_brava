@@ -1,17 +1,33 @@
-export interface ComboGroupDef {
-  id: string;
-  title: string;
-  required: boolean;
-  limit: number;
-  allowedCategoryIds?: string[];
-  allowedProductIds?: string[];
+import type { ID, Timestamp } from './SharedTypes';
+
+/**
+ * Reglas de selección del slot
+ */
+export type ComboSlotRequirement = 'required' | 'optional';
+
+/**
+ * Slot dentro de un ComboDefinition (grupo de selección)
+ */
+export interface ComboSlot {
+  id: ID;
+  name: string;
+  required: ComboSlotRequirement;
+  min?: number; // mínimo permitido
+  max?: number; // máximo permitido
+  allowedProductIds?: ID[]; // si se omite o está vacío => todos permitidos
 }
 
+/**
+ * ComboDefinition
+ * Plantilla editable por admin
+ */
 export interface ComboDefinition {
-  id: string;
+  id: ID;
   name: string;
-  basePrice: number;
-  isActive?: boolean;
-  groups: ComboGroupDef[];
   description?: string;
+  basePrice?: number;
+  isActive?: boolean;
+  slots?: ComboSlot[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
