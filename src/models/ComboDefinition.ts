@@ -1,33 +1,29 @@
-import type { ID, Timestamp } from './SharedTypes';
+import type { ID } from './SharedTypes';
 
-/**
- * Reglas de selección del slot
- */
-export type ComboSlotRequirement = 'required' | 'optional';
-
-/**
- * Slot dentro de un ComboDefinition (grupo de selección)
- */
-export interface ComboSlot {
-  id: ID;
-  name: string;
-  required: ComboSlotRequirement;
-  min?: number; // mínimo permitido
-  max?: number; // máximo permitido
-  allowedProductIds?: ID[]; // si se omite o está vacío => todos permitidos
+export interface ComboRules {
+  allowCustomChoice: boolean;
+  maxPizzas: number;
+  maxDrinks: number;
+  maxSides: number;
 }
 
-/**
- * ComboDefinition
- * Plantilla editable por admin
- */
+export interface ComboSlot {
+  id: string;
+  name: string;
+  max: number;
+  allowedProductIds: ID[];
+}
+
 export interface ComboDefinition {
   id: ID;
+  categoryId: string; // "combos"
   name: string;
-  description?: string;
-  basePrice?: number;
-  isActive?: boolean;
-  slots?: ComboSlot[];
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  description?: string; // Opcional en BD, pero usado en UI
+  price: number;        // <--- FALTABA ESTO
+  isAvailable: boolean; // <--- FALTABA ESTO
+  itemsIncluded: string[]; 
+  rules: ComboRules;    // <--- FALTABA ESTO
+  
+  // Slots opcionales para la lógica de selección (si tu UI lo requiere para armar combos dinámicos)
+  slots?: ComboSlot[]; 
 }
