@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { container } from '../../models/di/container';
 
-// Importamos desde los archivos originales
+// Importamos desde los archivos originales para evitar duplicados
 import { AuthProvider, useAuthContext } from '../AuthContext'; 
 import { AdminProvider } from '../AdminContext';
 import { MenuProvider } from '../MenuContext';
@@ -13,19 +13,21 @@ interface AppProvidersProps {
   children: ReactNode;
 }
 
-// Componente interno que decide qué cargar según el rol
-const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
+// Componente interno para manejar la lógica de carga y roles
+const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading } = useAuthContext();
 
-  if (loading) return <div className="h-screen w-full bg-white" />; // Un simple placeholder mientras carga
+  // 1. Si está cargando, mostramos un fallback para evitar montar la app sin datos
+  if (loading) return <div className="h-screen w-full bg-white flex items-center justify-center">Cargando sistema...</div>;
 
-  // Normalizamos el rol para evitar errores de mayúsculas/minúsculas
   const role = user?.role?.toLowerCase();
 
-  // 1. Empezamos con el contenido base (el Router)
+  // 2. Definimos el contenido base
   let content = <>{children}</>;
 
-  // 2. Providers de Cocina (Solo si es admin o cocina)
+  // 3. Inyectamos proveedores específicos según el rol (Admin/Cocina)
+  // Estos son más pesados o específicos, así que se pueden mantener condicionales si se desea,
+  // pero KitchenProvider suele ser útil tenerlo disponible si el usuario tiene permisos mixtos.
   if (role === 'admin' || role === 'cocina') {
     content = (
       <KitchenProvider orderRepo={container.ordersRepo}>
@@ -34,18 +36,7 @@ const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
     );
   }
 
-  // 3. Providers de Venta/Admin (Admin y Recepción)
-  if (role === 'admin' || role === 'recepcion') {
-    content = (
-      <OrderProvider>
-        <POSProvider>
-          {content}
-        </POSProvider>
-      </OrderProvider>
-    );
-  }
-
-  // 4. Provider de Admin (SOLO Admin)
+  // 4. Inyectamos AdminProvider SOLO para administradores
   if (role === 'admin') {
     content = (
       <AdminProvider settingsRepo={container.systemSettingsRepo} rulesRepo={container.rulesRepo}>
@@ -54,22 +45,27 @@ const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
     );
   }
 
-  // Devolvemos el contenido envuelto en los providers específicos de rol
-  return <>{content}</>;
+  // 5. ESTRUCTURA ESTABLE:
+  // Envolvemos el contenido dinámico con los Proveedores Globales de Datos.
+  // Menu, Order y POS son necesarios para la operación principal y no deben desmontarse.
+  // El orden es importante: Menu -> Order -> POS
+  return (
+    <MenuProvider menuRepo={container.menuRepo} categoryRepo={container.categoryRepo}>
+      <OrderProvider>
+        <POSProvider>
+           {content}
+        </POSProvider>
+      </OrderProvider>
+    </MenuProvider>
+  );
 };
 
 export const AppProviders = ({ children }: AppProvidersProps) => {
   return (
     <AuthProvider>
-      {/* MOVIDO: El MenuProvider ahora envuelve todo de forma estable.
-        Esto garantiza que POSPage siempre tenga acceso al contexto, 
-        sin importar el estado de carga o el rol del usuario.
-      */}
-      <MenuProvider menuRepo={container.menuRepo} categoryRepo={container.categoryRepo}>
-        <RoleBasedProviders>
-          {children}
-        </RoleBasedProviders>
-      </MenuProvider>
+      <AppStateProvider>
+        {children}
+      </AppStateProvider>
     </AuthProvider>
   );
 };
