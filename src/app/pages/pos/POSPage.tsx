@@ -3,19 +3,19 @@ import { useMenu } from '../../../hooks/useMenu';
 import { usePOSCommands } from '../../../hooks/usePOSCommands';
 import { useTables } from '../../../hooks/useTables';
 
-// Components UI - CORREGIDOS IMPORTS (Named Exports)
+// Components UI
 import { ProductGrid } from './ProductGrid';
-import { CartSidebar } from './CartSidebar';
+import CartSidebar from './CartSidebar';
 import { CategoryTabs } from './CategoryTabs';
-import { ProductDetailModal } from './ProductDetailModal';   // <--- Corregido
-import { OrderTypeModal } from './OrderTypeModal';           // <--- Corregido
-import { ComboSelectionModal } from './ComboSelectionModal'; // <--- Corregido
+import { ProductDetailModal } from './ProductDetailModal';
+import { OrderTypeModal } from './OrderTypeModal';
+import { ComboSelectionModal } from './ComboSelectionModal';
 
 // Models
 import type { MenuItem } from '../../../models/MenuItem';
-import type { Combo } from '../../../models/Combo';
-import type { OrderType } from '../../../models/Order'; // Importar tipos necesarios
+import type { ComboDefinition } from '../../../models/ComboDefinition'; // <--- IMPORTANTE
 import type { OrderItem } from '../../../models/OrderItem';
+import type { OrderType } from '../../../models/Order';
 
 const POSPage: React.FC = () => {
   const { categories, products, combos, loading: menuLoading } = useMenu();
@@ -26,7 +26,10 @@ const POSPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
-  const [selectedCombo, setSelectedCombo] = useState<Combo | null>(null);
+  
+  // Estado tipado correctamente como DEFINICIÓN, no instancia
+  const [selectedCombo, setSelectedCombo] = useState<ComboDefinition | null>(null); 
+  
   const [isOrderTypeModalOpen, setIsOrderTypeModalOpen] = useState(false);
 
   const filteredProducts = useMemo(() => {
@@ -79,14 +82,15 @@ const POSPage: React.FC = () => {
           <ProductGrid 
             products={filteredProducts}
             combos={filteredCombos}
-            onProductClick={(prod: MenuItem) => { // <--- Tipado explícito
+            onProductClick={(prod: MenuItem) => {
               if (prod.usesIngredients || prod.usesFlavors || prod.usesSizeVariant) {
                 setSelectedProduct(prod);
               } else {
                 commands.addProductToCart(prod);
               }
             }}
-            onComboClick={(combo: Combo) => setSelectedCombo(combo)} // <--- Tipado explícito
+            // Ahora el callback recibe una Definición
+            onComboClick={(combo: ComboDefinition) => setSelectedCombo(combo)} 
           />
         </main>
       </div>
@@ -100,14 +104,14 @@ const POSPage: React.FC = () => {
         onProcess={() => setIsOrderTypeModalOpen(true)}
       />
 
-      {/* Modales con Tipos Explícitos en Callbacks */}
+      {/* MODALES */}
       
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onConfirm={(productWithOpts: MenuItem) => { // <--- Tipado explícito
+          onConfirm={(productWithOpts: MenuItem) => {
              commands.addProductToCart(productWithOpts); 
              setSelectedProduct(null);
           }}
@@ -116,10 +120,10 @@ const POSPage: React.FC = () => {
 
       {selectedCombo && (
         <ComboSelectionModal
-          combo={selectedCombo}
+          combo={selectedCombo} // Ahora los tipos coinciden (ComboDefinition)
           isOpen={!!selectedCombo}
           onClose={() => setSelectedCombo(null)}
-          onConfirm={(comboItem: OrderItem) => { // <--- Tipado explícito
+          onConfirm={(comboItem: OrderItem) => {
             commands.addComboToCart(comboItem);
             setSelectedCombo(null);
           }}
@@ -131,7 +135,7 @@ const POSPage: React.FC = () => {
         onClose={() => setIsOrderTypeModalOpen(false)}
         isLoading={isSubmitting}
         tables={tables}
-        onConfirm={async (type: OrderType, meta: any) => { // <--- Tipado explícito (OrderType)
+        onConfirm={async (type: OrderType, meta: any) => {
           await commands.submitOrder(type, meta);
           if (cart.length === 0) setIsOrderTypeModalOpen(false); 
         }}

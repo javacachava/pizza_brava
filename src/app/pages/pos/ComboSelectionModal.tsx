@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import type { Combo } from '../../../models/Combo';
+import React from 'react';
+import type { ComboDefinition } from '../../../models/ComboDefinition'; // <--- USAR DEFINICIÓN
 import type { OrderItem } from '../../../models/OrderItem';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { formatPrice } from '../../../utils/format';
 
 interface Props {
-  combo: Combo | null;
+  combo: ComboDefinition | null; // <--- TIPO CORRECTO: Aquí viene la descripción
   isOpen: boolean;
   onClose: () => void;
-  // El modal debe devolver un OrderItem completo
   onConfirm: (comboItem: OrderItem) => void;
 }
 
@@ -19,23 +18,27 @@ export const ComboSelectionModal: React.FC<Props> = ({
   onClose,
   onConfirm
 }) => {
-  // Aquí iría la lógica compleja de selección de slots.
-  // Por simplicidad y para corregir el error, implementamos la versión básica
-  // que asume un combo predefinido o sin opciones por ahora.
-  
   if (!combo) return null;
 
   const handleConfirm = () => {
-    // Construimos el OrderItem aquí (Domain Logic en UI boundary)
+    // Convertimos la Definición (catálogo) en un Item de Orden (carrito)
     const orderItem: OrderItem = {
-      productId: null, // Es un combo, no un producto simple
+      productId: null, 
       productName: combo.name,
       quantity: 1,
       unitPrice: combo.price,
       totalPrice: combo.price,
       isCombo: true,
-      combo: combo, // Guardamos la ref
-      selectedOptions: [] // Aquí irían las selecciones de slots convertidas a opciones
+      // Guardamos referencia a la definición si el modelo lo permite, 
+      // o adaptamos según tu interface OrderItem
+      combo: {
+          id: `inst_${Date.now()}`, // ID temporal de instancia
+          comboDefinitionId: combo.id,
+          name: combo.name,
+          price: combo.price,
+          items: [] // Aquí irían los items seleccionados
+      }, 
+      selectedOptions: []
     };
 
     onConfirm(orderItem);
@@ -56,13 +59,12 @@ export const ComboSelectionModal: React.FC<Props> = ({
       }
     >
       <div className="p-2 space-y-4">
-        <p className="text-gray-600">{combo.description}</p>
+        {/* Ahora combo.description SI existe porque es ComboDefinition */}
+        <p className="text-gray-600">{combo.description}</p> 
         
         <div className="bg-blue-50 p-3 rounded text-sm text-blue-800">
-          ℹ️ Configuración de combo simplificada. Haga clic en confirmar para agregar.
+          ℹ️ Configuración rápida. (Reglas: {combo.rules?.maxPizzas || 0} pizzas)
         </div>
-        
-        {/* Aquí renderizarías los selectores si 'combo' tuviera slots definidos en el frontend */}
       </div>
     </Modal>
   );
