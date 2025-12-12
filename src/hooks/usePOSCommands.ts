@@ -2,132 +2,89 @@ import { useState } from 'react';
 import { usePOSContext } from '../contexts/POSContext';
 import { container } from '../models/di/container';
 import type { MenuItem } from '../models/MenuItem';
-import type { ComboDefinition } from '../models/ComboDefinition';
-import type { OrderItem } from '../models/OrderItem';
+import type { OrderItem, SelectedOption } from '../models/OrderItem';
 import type { Order, OrderType } from '../models/Order';
-import { cartService } from '../services/domain/cartService'; // Importamos el dominio
+import { cartService } from '../services/domain/cartService';
 import { orderValidators } from '../utils/validators';
 import { generateId } from '../utils/id';
 import { toast } from 'react-hot-toast';
 
 export function usePOSCommands() {
-  // Consumimos el contexto SOLO para obtener estado y setters base
   const { cart, addOrderItem, updateQuantity, removeIndex, clear } = usePOSContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const ordersService = container.ordersService;
 
-  // --- Comandos de Manipulación del Carrito ---
+  // --- Comandos ---
 
-  const increaseQuantity = (index: number) => {
-    // Usamos el servicio de dominio, pero como el estado vive en Context,
-    // llamamos a la función del contexto que ya delega (o debería delegar) al servicio.
-    // Si el contexto es simple, hacemos la lógica aquí y seteamos completo.
-    updateQuantity(index, 1);
-  };
-
+  const increaseQuantity = (index: number) => updateQuantity(index, 1);
   const decreaseQuantity = (index: number) => {
-    const item = cart[index];
-    if (item && item.quantity > 1) {
-      updateQuantity(index, -1);
-    } else {
-      toast('Usa el botón "Eliminar" para quitar el ítem');
-    }
+    if (cart[index].quantity > 1) updateQuantity(index, -1);
+    else toast('Usa el botón eliminar');
   };
-
   const removeItem = (index: number) => {
-    if (window.confirm('¿Eliminar producto?')) {
-      removeIndex(index);
-      toast.success('Producto eliminado');
-    }
+    if (confirm('¿Eliminar?')) removeIndex(index);
   };
-
   const clearOrder = () => {
-    if (cart.length === 0) return;
-    if (window.confirm('¿Estás seguro de BORRAR toda la orden actual?')) {
-      clear();
-      toast('Orden limpiada', { icon: '🗑️' });
-    }
+    if (cart.length > 0 && confirm('¿Limpiar orden?')) clear();
   };
-
-  // --- Comandos de Agregado (Facilitadores) ---
 
   /**
-   * Agrega un producto simple o configurado.
-   * Recibe el objeto MenuItem y opcionalmente cantidad/notas.
+   * Agrega producto con soporte completo para notas y OPCIONES (Sabores)
    */
-  const addProductToCart = (product: MenuItem, quantity: number = 1, notes: string = '') => {
+  const addProductToCart = (
+    product: MenuItem, 
+    quantity: number = 1, 
+    notes: string = '',
+    options: SelectedOption[] = [] // <--- Nuevo argumento
+  ) => {
+    // 1. Crear item base
     const item = cartService.createItemFromProduct(product, quantity, notes);
+    
+    // 2. Adjuntar opciones (Sabores, etc)
+    if (options.length > 0) {
+      item.selectedOptions = options;
+      // Opcional: Sumar precio de opciones si tuvieran costo
+      // item.unitPrice += options.reduce((sum, opt) => sum + (opt.price || 0), 0);
+      // item.totalPrice = item.unitPrice * quantity;
+    }
+
+    // 3. Agregar al carrito (el hook usePOS se encarga de agrupar)
     addOrderItem(item);
     toast.success(`${product.name} agregado`);
   };
 
-  /**
-   * Recibe un OrderItem ya construido (normalmente desde el Modal de Combos).
-   */
   const addComboToCart = (comboItem: OrderItem) => {
     addOrderItem(comboItem);
-    toast.success('Combo agregado exitosamente');
+    toast.success('Combo agregado');
   };
 
-  // --- Comando Crítico: Enviar Orden ---
-
-  const submitOrder = async (
-    orderType: OrderType,
-    meta: {
-      tableId?: string;
-      tableName?: string;
-      customerName?: string;
-      phone?: string;
-      address?: string;
-      note?: string;
-    }
-  ) => {
-    // 1. Validar reglas de negocio antes de tocar la BD
-    const validation = orderValidators.validateOrder(cart, orderType, meta);
+  const submitOrder = async (type: OrderType, meta: any) => {
+    const validation = orderValidators.validateOrder(cart, type, meta);
     if (!validation.isValid) {
-      toast.error(validation.error || 'Orden inválida');
+      toast.error(validation.error || 'Error');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 2. Construir objeto Order final
-      const total = cartService.calculateTotal(cart);
-      
       const newOrder: Order = {
         id: generateId(),
-        items: [...cart], // Snapshot inmutable
-        total: total,
-        subTotal: total, // Ajustar si hay impuestos
-        tax: 0,
+        items: [...cart],
+        total: cartService.calculateTotal(cart),
         status: 'pendiente',
-        orderType: orderType,
-        createdAt: new Date() as any, // Ajuste para Timestamp de Firestore
-        
-        // Mapeo seguro de campos opcionales
+        orderType: type,
+        createdAt: new Date() as any,
         tableNumber: meta.tableId || null,
-        customerName: meta.customerName || 'Cliente General',
-        
-        // Metadatos extendidos para tickets/cocina
-        meta: {
-          tableName: meta.tableName,
-          phone: meta.phone,
-          address: meta.address,
-          note: meta.note
-        }
+        customerName: meta.customerName || 'Cliente',
+        meta: { ...meta }
       };
 
-      // 3. Persistir usando Infraestructura
       await ordersService.createOrder(newOrder);
-
-      // 4. Limpieza y Feedback
-      toast.success('¡Orden enviada a Cocina!');
+      toast.success('Orden enviada');
       clear();
-      
     } catch (error) {
-      console.error('Error al enviar orden:', error);
-      toast.error('Error de conexión. No se pudo guardar.');
+      console.error(error);
+      toast.error('Error enviando orden');
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +93,6 @@ export function usePOSCommands() {
   return {
     cart,
     isSubmitting,
-    cartTotal: cartService.calculateTotal(cart), // Exponemos total calculado
     commands: {
       increaseQuantity,
       decreaseQuantity,

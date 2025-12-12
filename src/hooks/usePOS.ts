@@ -5,36 +5,42 @@ import type { OrderItem } from '../models/OrderItem';
 import { cartService } from '../services/domain/cartService';
 
 export function usePOS() {
-  const posService = container.posService;
+  // Estado local del carrito
   const [cart, setCart] = useState<OrderItem[]>([]);
 
-  // Mantiene la lógica original de posService para agregar productos complejos
+  // Esta función SOLO se usa para compatibilidad legacy si algo la llama directo.
+  // Idealmente todo debe entrar por addOrderItem ahora.
   const addProduct = (product: MenuItem, quantity: number = 1, extras: number = 0) => {
-    setCart(prev => posService.addProduct(prev, product, quantity, extras));
+    const item = cartService.createItemFromProduct(product, quantity);
+    setCart(prev => cartService.addItem(prev, item));
   };
 
+  /**
+   * Agrega un item al carrito usando la lógica de agrupación del dominio.
+   * Si el item ya existe (mismo ID, mismas opciones), suma cantidad.
+   * Si es diferente, agrega nueva fila.
+   */
   const addOrderItem = (item: OrderItem) => {
-    setCart(prev => posService.addOrderItem(prev, item));
+    setCart(prev => cartService.addItem(prev, item));
   };
 
-  // NUEVO: Implementación de updateQuantity delegando al dominio
   const updateQuantity = (index: number, delta: number) => {
     setCart(prev => cartService.updateQuantity(prev, index, delta));
   };
 
   const removeIndex = (index: number) => {
-    setCart(prev => posService.removeIndex(prev, index));
+    setCart(prev => cartService.removeItem(prev, index));
   };
 
   const clear = () => {
-    setCart(posService.clear());
+    setCart([]);
   };
 
   return {
     cart,
     addProduct,
-    addOrderItem,
-    updateQuantity, // Exportamos la nueva función
+    addOrderItem, // <--- Esta es la clave
+    updateQuantity,
     removeIndex,
     clear,
   };

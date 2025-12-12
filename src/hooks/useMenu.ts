@@ -4,20 +4,24 @@ import { container } from '../models/di/container';
 import type { MenuItem } from '../models/MenuItem';
 import type { Category } from '../models/Category';
 import type { ComboDefinition } from '../models/ComboDefinition';
+import type { Flavor } from '../models/Flavor'; // Asegúrate de tener este tipo
 import { MenuService } from '../services/domain/MenuService';
 import { ComboService } from '../services/domain/ComboService';
+// Importamos FlavorService o repositorio
+import { FlavorsRepository } from '../repos/implementations/FlavorsRepository';
 
 export function useMenu() {
   const { isAuthenticated } = useAuthContext();
   
-  // Instancia servicios usando inyección manual del container
   const menuService = new MenuService(container.menuRepo, container.categoryRepo);
-  // Asumiendo que el constructor de ComboService recibe ComboDefinitionRepository y MenuRepository
   const comboService = new ComboService(container.comboDefRepo, container.menuRepo);
+  // Instanciamos repo de sabores directo por simplicidad o úsalo vía servicio si existe
+  const flavorsRepo = new FlavorsRepository();
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [combos, setCombos] = useState<ComboDefinition[]>([]);
+  const [flavors, setFlavors] = useState<Flavor[]>([]); // <--- NUEVO
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -25,18 +29,19 @@ export function useMenu() {
 
     setLoading(true);
     try {
-      // Carga paralela para performance óptima
-      const [fetchedItems, fetchedCategories, fetchedCombos] = await Promise.all([
+      const [fetchedItems, fetchedCategories, fetchedCombos, fetchedFlavors] = await Promise.all([
         menuService.getMenu(),
         menuService.getCategories(),
-        comboService.getDefinitions()
+        comboService.getDefinitions(),
+        flavorsRepo.getAll() // <--- Cargar sabores
       ]);
 
       setItems(fetchedItems);
       setCategories(fetchedCategories);
       setCombos(fetchedCombos);
+      setFlavors(fetchedFlavors);
     } catch (e) {
-      console.error("Error crítico cargando menú POS:", e);
+      console.error("Error cargando datos POS:", e);
     } finally {
       setLoading(false);
     }
@@ -48,8 +53,9 @@ export function useMenu() {
 
   return {
     categories,
-    products: items, // Alias 'products' para la UI
+    products: items,
     combos,
+    flavors, // <--- Exportamos
     loading,
     refresh: load
   };

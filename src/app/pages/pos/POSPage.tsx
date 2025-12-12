@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMenu } from '../../../hooks/useMenu';
 import { usePOSCommands } from '../../../hooks/usePOSCommands';
 import { useTables } from '../../../hooks/useTables';
@@ -15,28 +15,31 @@ import type { ComboDefinition } from '../../../models/ComboDefinition';
 import type { OrderType } from '../../../models/Order';
 
 export const POSPage: React.FC = () => {
-  const { categories, products, combos, loading: menuLoading } = useMenu();
+  // Obtenemos flavors del hook useMenu actualizado
+  const { categories, products, combos, flavors, loading: menuLoading } = useMenu();
   const { tables } = useTables();
   const { cart, commands, isSubmitting } = usePOSCommands();
 
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<ComboDefinition | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
-  // --- Filtros ---
-  const filteredProducts = useMemo(() => {
-    let items = selectedCategory
-      ? products.filter(p => p.categoryId === selectedCategory)
-      : products; // En "Todos", mostramos productos
+  useEffect(() => {
+    if (!menuLoading && categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, menuLoading, selectedCategory]);
 
+  const filteredProducts = useMemo(() => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      items = items.filter(p => p.name.toLowerCase().includes(q));
+      return products.filter(p => p.name.toLowerCase().includes(q));
     }
-    return items;
+    if (!selectedCategory) return [];
+    return products.filter(p => p.categoryId === selectedCategory);
   }, [selectedCategory, products, searchQuery]);
 
   const filteredCombos = useMemo(() => {
@@ -44,57 +47,38 @@ export const POSPage: React.FC = () => {
        const q = searchQuery.toLowerCase();
        return combos.filter(c => c.name.toLowerCase().includes(q));
     }
-    // En "Todos" o categoría "combos", mostramos combos
-    if (!selectedCategory || selectedCategory === 'combos') {
+    if (selectedCategory === 'combos') {
         return combos;
     }
     return [];
   }, [selectedCategory, combos, searchQuery]);
 
-  if (menuLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-xl font-bold text-orange-500 animate-pulse">Cargando Menú...</div>
-      </div>
-    );
-  }
+  if (menuLoading) return <div className="p-10 text-center">Cargando...</div>;
 
   return (
     <div className="flex h-screen w-full bg-gray-100 overflow-hidden font-sans">
-      
-      {/* SECCIÓN CATÁLOGO */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative mr-80">
-        
-        {/* Header */}
-        <header className="bg-white px-6 py-4 shadow-sm z-10 border-b border-gray-200">
+        <header className="bg-white px-6 pt-4 pb-2 shadow-sm z-10 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4 gap-4">
-            <h1 className="text-2xl font-black text-gray-800 hidden lg:block">
-              Pizza<span className="text-orange-600">Brava</span>
-            </h1>
+            <h1 className="text-2xl font-black text-gray-800 hidden lg:block">Pizza Brava</h1>
             <div className="relative flex-1 max-w-lg">
               <input
-                type="text"
-                placeholder="🔍 Buscar..."
-                className="w-full px-4 py-3 bg-gray-100 border-transparent focus:bg-white focus:border-orange-500 rounded-xl outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-gray-100 rounded-xl border-transparent focus:bg-white focus:border-orange-500 outline-none transition-all"
+                placeholder="Buscar..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
-          
-          <CategoryTabs 
-            categories={categories}
-            active={selectedCategory}
-            onChange={setSelectedCategory}
-          />
+          <CategoryTabs categories={categories} active={selectedCategory} onChange={setSelectedCategory} />
         </header>
 
-        {/* Grid de Productos */}
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
           <ProductGrid 
             products={filteredProducts}
             combos={filteredCombos}
             onProductClick={(prod) => {
+              // Ahora Frozen entra aquí porque usesFlavors=true
               if (prod.usesIngredients || prod.usesFlavors || prod.usesSizeVariant) {
                 setSelectedProduct(prod);
               } else {
@@ -106,7 +90,6 @@ export const POSPage: React.FC = () => {
         </main>
       </div>
 
-      {/* SIDEBAR */}
       <CartSidebar 
         cart={cart}
         onIncrease={commands.increaseQuantity}
@@ -121,10 +104,12 @@ export const POSPage: React.FC = () => {
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
+          allFlavors={flavors} // <--- Pasamos los sabores cargados
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onConfirm={(product, qty, notes) => {
-             commands.addProductToCart(product, qty, notes);
+          onConfirm={(product, qty, notes, options) => {
+             // Pasamos options (sabor seleccionado) al comando
+             commands.addProductToCart(product, qty, notes, options);
              setSelectedProduct(null);
           }}
         />
@@ -139,7 +124,7 @@ export const POSPage: React.FC = () => {
             commands.addComboToCart(comboItem);
             setSelectedCombo(null);
           }}
-          products={products} // <--- Pasamos el menú completo para poblar los selectores
+          products={products}
         />
       )}
 
