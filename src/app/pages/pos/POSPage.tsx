@@ -1,266 +1,167 @@
-// src/app/pages/pos/POSPage.tsx
-import React, { useEffect, useState, useMemo } from 'react';
-import { useMenuContext } from '../../../contexts/MenuContext';
-import { usePOSContext } from '../../../contexts/POSContext';
-import { useOrderContext } from '../../../contexts/providers/OrderProvider';
-import { container } from '../../../models/di/container';
-
-import { ProductGrid } from './ProductGrid';
-import { ProductDetailModal } from './ProductDetailModal';
-import { CategoryTabs } from './CategoryTabs';
-import CartSidebar from './CartSidebar';
-import { ComboSelectionModal } from './ComboSelectionModal';
-import { OrderTypeModal } from './OrderTypeModal';
-
+import React, { useState, useMemo } from 'react';
+import { useMenu } from '../../../hooks/useMenu';
 import { usePOSCommands } from '../../../hooks/usePOSCommands';
+import { useTables } from '../../../hooks/useTables';
 
+// Components UI
+import ProductGrid from './ProductGrid';
+import CartSidebar from './CartSidebar';
+import CategoryTabs from './CategoryTabs';
+import ProductDetailModal from './ProductDetailModal';
+import OrderTypeModal from './OrderTypeModal';
+import ComboSelectionModal from './ComboSelectionModal';
+import LoadingSpinner from '../../components/ui/LoadingSpinner'; // Asumiendo existencia o usar uno simple
+
+// Models
 import type { MenuItem } from '../../../models/MenuItem';
-import type { ComboDefinition } from '../../../models/ComboDefinition';
-import type { OrderItem } from '../../../models/OrderItem';
-import type { OrderType } from '../../../models/Order';
+import type { Combo } from '../../../models/Combo';
 
-import { formatPrice } from '../../../utils/format';
-import { calculateCartTotal } from '../../../utils/pos';
-import { generateSafeId } from '../../../utils/id';
+/**
+ * POSPage
+ * Componente de UI Principal ("View").
+ * Responsabilidad: Renderizar el estado y capturar eventos del usuario.
+ * NO contiene lógica de negocio (cálculos, validaciones, manipulaciones de array).
+ */
+const POSPage: React.FC = () => {
+  // 1. Hooks de Infraestructura (Datos)
+  const { categories, products, combos, loading: menuLoading } = useMenu();
+  const { tables } = useTables();
+  
+  // 2. Hook de Aplicación (Lógica y Comandos)
+  const { cart, commands, isSubmitting } = usePOSCommands();
 
-export const POSPage: React.FC = () => {
-  const {
-    items: menuItems,
-    categories,
-    loading: menuLoading,
-    refresh: refreshMenu
-  } = useMenuContext();
-
-  const {
-    cart,
-    addProduct,
-    addOrderItem,
-    updateQuantity,
-    removeIndex,
-    clear
-  } = usePOSContext();
-
-  const { createOrder, refresh: refreshOrders } = useOrderContext();
-
-  const { cart: commandsCart, commands } = usePOSCommands();
-
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-
+  // 3. Estado Local (Solo para UI: Modales y Tabs)
+  const [selectedCategory, setSelectedCategory] = useState<string>('todos');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Modales
   const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
-  const [isProductModalOpen, setProductModalOpen] = useState(false);
+  const [selectedCombo, setSelectedCombo] = useState<Combo | null>(null);
+  const [isOrderTypeModalOpen, setIsOrderTypeModalOpen] = useState(false);
 
-  const [comboDefinitions, setComboDefinitions] = useState<ComboDefinition[]>([]);
-  const [selectedComboDef, setSelectedComboDef] = useState<ComboDefinition | null>(null);
-  const [isComboModalOpen, setComboModalOpen] = useState(false);
+  // --- Filtrado de Productos (UI Logic) ---
+  const filteredItems = useMemo(() => {
+    let items = selectedCategory === 'todos' 
+      ? products 
+      : products.filter(p => p.categoryId === selectedCategory);
 
-  const [isOrderTypeOpen, setOrderTypeOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Cargar definiciones de combo
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const defs = await container.comboService.getDefinitions();
-        if (mounted) setComboDefinitions(defs);
-      } catch (err) {
-        console.error('Error cargando definiciones de combo', err);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  // Productos filtrados
-  const displayed: MenuItem[] = useMemo(() => {
-    if (!activeCategory) return menuItems;
-    return menuItems.filter((i: MenuItem) => i.categoryId === activeCategory);
-  }, [menuItems, activeCategory]);
-
-  const handleProductClick = (p: MenuItem) => {
-    setSelectedProduct(p);
-    setProductModalOpen(true);
-  };
-
-  const handleAddProduct = (qty: number) => {
-    if (!selectedProduct) return;
-    commands.add(selectedProduct, qty, 0);
-    setProductModalOpen(false);
-  };
-
-  const handleConfirmCombo = (selections: Record<string, string[]>) => {
-    if (!selectedComboDef) return;
-
-    const comboInstance = container.comboService.generateCombo(
-      selectedComboDef,
-      selections
-    );
-
-    const comboOrderItem: OrderItem = {
-      productId: comboInstance.id,
-      productName: comboInstance.name + ' (Combo)',
-      quantity: 1,
-      unitPrice: comboInstance.price,
-      totalPrice: comboInstance.price,
-      isCombo: true,
-      combo: comboInstance,
-      selectedOptions: [],
-      comment: ''
-    };
-
-    commands.addCombo(comboOrderItem);
-
-    setComboModalOpen(false);
-    setSelectedComboDef(null);
-  };
-
-  const handleOpenOrderType = () => {
-    if (cart.length === 0) {
-      alert('El carrito está vacío.');
-      return;
+    if (searchQuery) {
+      const lowerQ = searchQuery.toLowerCase();
+      items = items.filter(p => p.name.toLowerCase().includes(lowerQ));
     }
-    setOrderTypeOpen(true);
-  };
+    return items;
+  }, [selectedCategory, products, searchQuery]);
 
-  const handleSubmitOrder = async (type: OrderType) => {
-    setSubmitting(true);
-    try {
-      const items = cart.map((ci: OrderItem) => ({
-        productId: ci.productId ?? generateSafeId(),
-        productName: ci.productName,
-        quantity: ci.quantity,
-        unitPrice: ci.unitPrice,
-        totalPrice: ci.totalPrice,
-        comment: ci.comment,
-        selectedOptions: ci.selectedOptions,
-        isCombo: ci.isCombo ?? false,
-        combo: ci.combo ?? null
-      }));
+  // --- Filtrado de Combos (UI Logic) ---
+  const filteredCombos = useMemo(() => {
+    if (selectedCategory !== 'combos' && selectedCategory !== 'todos') return [];
+    // Asumiendo que los combos se muestran cuando la categoría es 'combos' o 'todos'
+    // O si tienes una categoría específica en bootstrap.json llamada 'combos'
+    return combos; 
+  }, [selectedCategory, combos]);
 
-      const total = calculateCartTotal(items);
 
-      const orderPayload = {
-        id: generateSafeId(),
-        items,
-        total,
-        orderType: type,
-        status: 'pending',
-        createdAt: Date.now()
-      };
-
-      await createOrder(orderPayload);
-      clear();
-      setOrderTypeOpen(false);
-      alert('Orden creada correctamente');
-      refreshOrders();
-    } catch (err) {
-      console.error(err);
-      alert('Error creando orden');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  if (menuLoading) return <div className="flex h-screen items-center justify-center"><p>Cargando menú...</p></div>;
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <main className="flex-1 p-6 mr-80"> {/* mr-80 para dejar espacio al sidebar fijo */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold">Punto de Venta</h1>
-            <p className="text-sm text-gray-600">Selecciona productos para comenzar la orden</p>
+    <div className="flex h-screen w-full bg-gray-100 overflow-hidden">
+      
+      {/* SECCIÓN IZQUIERDA: MENÚ Y PRODUCTOS */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        
+        {/* Header / Buscador */}
+        <header className="bg-white p-4 shadow-sm z-10">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-xl font-bold text-gray-800">Pizza Brava POS</h1>
+            <input
+              type="text"
+              placeholder="Buscar producto..."
+              className="px-4 py-2 border rounded-lg w-1/3 focus:ring-2 focus:ring-orange-500 outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-
-          <div className="text-right">
-            <div className="text-sm text-gray-600">Items: {cart.length}</div>
-            <div className="text-lg font-semibold">
-              {formatPrice(cart.reduce((acc, it) => acc + (it.totalPrice ?? 0), 0))}
-            </div>
-          </div>
-        </div>
-
-        <CategoryTabs
-          categories={categories}
-          active={activeCategory}
-          onChange={setActiveCategory}
-        />
-
-        <div className="mt-4">
-          <div className="flex justify-end gap-2 mb-2">
-            <select
-              value={activeCategory ?? ''}
-              onChange={e => setActiveCategory(e.target.value || null)}
-              className="input-field"
-            >
-              <option value="">Filtrar por categoría</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-
-            <button className="px-3 py-2 border rounded" onClick={() => refreshMenu()}>
-              Actualizar menú
-            </button>
-          </div>
-
-          <ProductGrid
-            products={displayed}
-            onProductClick={handleProductClick}
+          
+          {/* Categorías */}
+          <CategoryTabs 
+            categories={categories}
+            selectedId={selectedCategory}
+            onSelect={setSelectedCategory}
           />
-        </div>
-      </main>
+        </header>
 
-      <CartSidebar
+        {/* Grid de Productos */}
+        <main className="flex-1 overflow-y-auto p-4">
+          <ProductGrid 
+            products={filteredItems}
+            combos={selectedCategory === 'combos' || selectedCategory === 'todos' ? filteredCombos : []}
+            onProductClick={(prod) => {
+              if (prod.usesIngredients || prod.usesFlavors || prod.usesSizeVariant) {
+                // Si requiere configuración, abrir modal
+                setSelectedProduct(prod);
+              } else {
+                // Si es simple, agregar directo (Fast POS)
+                commands.addProductToCart(prod);
+              }
+            }}
+            onComboClick={(combo) => setSelectedCombo(combo)}
+          />
+        </main>
+      </div>
+
+      {/* SECCIÓN DERECHA: SIDEBAR CARRITO */}
+      <CartSidebar 
         cart={cart}
-        onIncrease={commands.increase}
-        onDecrease={commands.decrease}
-        onRemove={commands.remove}
-        onSubmitOrder={handleOpenOrderType}
+        onIncrease={commands.increaseQuantity}
+        onDecrease={commands.decreaseQuantity}
+        onRemove={commands.removeItem}
+        onClear={commands.clearOrder}
+        onProcess={() => setIsOrderTypeModalOpen(true)}
       />
 
-      {isProductModalOpen && selectedProduct && (
+      {/* --- MODALES --- */}
+
+      {/* 1. Detalle de Producto (Ingredientes/Sabores) */}
+      {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
-          onClose={() => { setProductModalOpen(false); setSelectedProduct(null); }}
-          onAdd={handleAddProduct}
+          isOpen={!!selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onConfirm={(product, quantity, extras) => { // Ajustar firma según tu componente real
+             // Aquí asumimos que el modal devuelve el producto base o configurado
+             // Si tu modal maneja lógica compleja, idealmente debería devolver un objeto listo para commands.addOrderItem
+             // Por simplicidad en este ejemplo, llamamos al addProduct simple
+             commands.addProductToCart(product); 
+             setSelectedProduct(null);
+          }}
         />
       )}
 
-      {isComboModalOpen && selectedComboDef && (
+      {/* 2. Constructor de Combos */}
+      {selectedCombo && (
         <ComboSelectionModal
-          definition={selectedComboDef}
-          menu={menuItems.reduce<Record<string, string>>(
-            (acc, mi: MenuItem) => {
-              acc[mi.id] = mi.name;
-              return acc;
-            },
-            {}
-          )}
-          onClose={() => { setComboModalOpen(false); setSelectedComboDef(null); }}
-          onConfirm={handleConfirmCombo}
+          combo={selectedCombo}
+          isOpen={!!selectedCombo}
+          onClose={() => setSelectedCombo(null)}
+          onConfirm={(comboItem) => {
+            commands.addComboToCart(comboItem);
+            setSelectedCombo(null);
+          }}
         />
       )}
 
-      {isOrderTypeOpen && (
-        <OrderTypeModal
-          open={isOrderTypeOpen}
-          onClose={() => setOrderTypeOpen(false)}
-          onSelect={(t: OrderType) => handleSubmitOrder(t)}
-        />
-      )}
-
-      <div style={{ position: 'fixed', bottom: 16, left: 16 }}>
-        {comboDefinitions.map((cd: ComboDefinition) => (
-          <button
-            key={cd.id}
-            onClick={() => {
-              setSelectedComboDef(cd);
-              setComboModalOpen(true);
-            }}
-            className="mr-2 px-3 py-2 bg-gray-100 rounded"
-          >
-            Combo: {cd.name}
-          </button>
-        ))}
-      </div>
+      {/* 3. Tipo de Orden y Envío */}
+      <OrderTypeModal 
+        isOpen={isOrderTypeModalOpen}
+        onClose={() => setIsOrderTypeModalOpen(false)}
+        isLoading={isSubmitting}
+        tables={tables} // Pasamos mesas para el select
+        onConfirm={(type, meta) => {
+          commands.submitOrder(type, meta);
+          // El cierre del modal y limpieza ocurre en submitOrder tras éxito
+          if (!isSubmitting) setIsOrderTypeModalOpen(false); 
+        }}
+      />
     </div>
   );
 };

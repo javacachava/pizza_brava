@@ -1,25 +1,55 @@
-import type { MenuItem } from '../models/MenuItem';
-import type { Order } from '../models/Order';
-import type { ComboDefinition } from '../models/Combo';
+import type { OrderItem } from '../models/OrderItem';
+import type { OrderType } from '../models/Order';
 
-export function validateMenuItem(item: Partial<MenuItem>): string[] {
-  const errors: string[] = [];
-  if (!item.name) errors.push('El producto requiere un nombre.');
-  if (item.price == null) errors.push('El producto requiere precio.');
-  if (!item.categoryId) errors.push('El producto requiere categoría.');
-  return errors;
+export interface OrderValidationResult {
+  isValid: boolean;
+  error?: string;
 }
 
-export function validateOrder(order: Partial<Order>): string[] {
-  const errors: string[] = [];
-  if (!order.items || order.items.length === 0)
-    errors.push('La orden no puede estar vacía.');
-  if (!order.orderType) errors.push('La orden requiere un tipo.');
-  return errors;
-}
+export const orderValidators = {
+  /**
+   * Valida si la orden cumple con los requisitos mínimos antes de enviarse.
+   * Reglas basadas en el Contexto Operacional del POS.
+   */
+  validateOrder(
+    cart: OrderItem[],
+    orderType: OrderType,
+    meta: {
+      tableId?: string | null;
+      customerName?: string;
+      phone?: string;
+      address?: string;
+    }
+  ): OrderValidationResult {
+    // 1. El carrito no puede estar vacío
+    if (!cart || cart.length === 0) {
+      return { isValid: false, error: 'El carrito está vacío.' };
+    }
 
-export function validateComboDefinition(def: Partial<ComboDefinition>): string[] {
-  const errors: string[] = [];
-  if (!def.name) errors.push('El combo requiere un nombre.');
-  return errors;
-}
+    // 2. Validación por Tipo de Orden
+    switch (orderType) {
+      case 'mesa':
+        // Regla 3.4 del Contexto: Si orderType = mesa → mesa es obligatoria.
+        if (!meta.tableId) {
+          return { isValid: false, error: 'Debe seleccionar una mesa para este pedido.' };
+        }
+        break;
+
+      case 'llevar':
+        // Regla 4: Si llevar → exigir nombre.
+        if (!meta.customerName || meta.customerName.trim().length === 0) {
+          return { isValid: false, error: 'El nombre del cliente es obligatorio para llevar.' };
+        }
+        break;
+
+      case 'pedido': // Delivery
+        // Regla 4: Si delivery → exigir nombre + teléfono + dirección.
+        if (!meta.customerName || !meta.phone || !meta.address) {
+          return { isValid: false, error: 'Delivery requiere Nombre, Teléfono y Dirección.' };
+        }
+        break;
+    }
+
+    return { isValid: true };
+  }
+};
