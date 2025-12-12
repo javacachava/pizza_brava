@@ -22,9 +22,15 @@ export const ProtectedRoute: React.FC<Props> = ({ allowedRoles, children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  // --- CORRECCIÓN AQUÍ ---
+  // Convertimos el rol del usuario a minúsculas para asegurar que coincida
+  const userRole = user.role ? user.role.toLowerCase() : '';
+  
+  // Verificamos si el rol normalizado está incluido en los roles permitidos
+  if (!allowedRoles.includes(userRole)) {
     return <Navigate to="/" replace />;
   }
+  // -----------------------
 
   return <>{children}</>;
 };
