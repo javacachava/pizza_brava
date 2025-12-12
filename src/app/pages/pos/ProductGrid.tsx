@@ -16,16 +16,24 @@ export const ProductGrid: React.FC<Props> = ({
   onProductClick, 
   onComboClick 
 }) => {
+  // Lógica de visualización limpia:
+  // Si hay combos, mostramos solo la sección de combos (asumiendo que estamos en la categoría Combos)
+  // Si hay productos, mostramos productos.
+  
+  if (combos.length === 0 && products.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+        <p>No se encontraron elementos.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="pb-20 space-y-8">
+    <div className="pb-20">
       
-      {/* SECCIÓN COMBOS */}
+      {/* SECCIÓN DE COMBOS (Solo se renderiza si hay combos en la lista filtrada) */}
       {combos.length > 0 && (
-        <div>
-          <h3 className="text-lg font-bold text-gray-700 mb-4 px-1 flex items-center gap-2">
-            🔥 Ofertas y Combos
-            <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{combos.length}</span>
-          </h3>
+        <div className="mb-8">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
             {combos.map(combo => (
               <ProductCard
@@ -49,15 +57,9 @@ export const ProductGrid: React.FC<Props> = ({
         </div>
       )}
 
-      {/* SECCIÓN PRODUCTOS */}
+      {/* SECCIÓN DE PRODUCTOS */}
       {products.length > 0 && (
         <div>
-          {combos.length > 0 && <hr className="border-gray-200 my-6" />} {/* Separador si hay ambos */}
-          
-          <h3 className="text-lg font-bold text-gray-700 mb-4 px-1 flex items-center gap-2">
-            🍕 Menú Individual
-            <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{products.length}</span>
-          </h3>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
             {products.map(p => (
               <ProductCard 
@@ -67,12 +69,6 @@ export const ProductGrid: React.FC<Props> = ({
               />
             ))}
           </div>
-        </div>
-      )}
-
-      {products.length === 0 && combos.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-          <p>No se encontraron productos.</p>
         </div>
       )}
     </div>

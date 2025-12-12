@@ -17,38 +17,35 @@ export function usePOSCommands() {
   // --- Comandos ---
 
   const increaseQuantity = (index: number) => updateQuantity(index, 1);
+
   const decreaseQuantity = (index: number) => {
-    if (cart[index].quantity > 1) updateQuantity(index, -1);
-    else toast('Usa el botón eliminar');
+    // Si tiene 1 y restamos, pasará a 0 y cartService lo eliminará.
+    // O podemos llamar a removeIndex explícitamente para feedback visual.
+    if (cart[index].quantity === 1) {
+       removeIndex(index); // Eliminación directa
+    } else {
+       updateQuantity(index, -1);
+    }
   };
+
   const removeItem = (index: number) => {
-    if (confirm('¿Eliminar?')) removeIndex(index);
+    removeIndex(index);
   };
+
   const clearOrder = () => {
     if (cart.length > 0 && confirm('¿Limpiar orden?')) clear();
   };
 
-  /**
-   * Agrega producto con soporte completo para notas y OPCIONES (Sabores)
-   */
   const addProductToCart = (
     product: MenuItem, 
     quantity: number = 1, 
     notes: string = '',
-    options: SelectedOption[] = [] // <--- Nuevo argumento
+    options: SelectedOption[] = []
   ) => {
-    // 1. Crear item base
     const item = cartService.createItemFromProduct(product, quantity, notes);
+    if (options.length > 0) item.selectedOptions = options;
     
-    // 2. Adjuntar opciones (Sabores, etc)
-    if (options.length > 0) {
-      item.selectedOptions = options;
-      // Opcional: Sumar precio de opciones si tuvieran costo
-      // item.unitPrice += options.reduce((sum, opt) => sum + (opt.price || 0), 0);
-      // item.totalPrice = item.unitPrice * quantity;
-    }
-
-    // 3. Agregar al carrito (el hook usePOS se encarga de agrupar)
+    // addOrderItem usa cartService.addItem que agrupa si es igual
     addOrderItem(item);
     toast.success(`${product.name} agregado`);
   };
