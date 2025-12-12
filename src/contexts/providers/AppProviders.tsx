@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { container } from '../../models/di/container';
 
-// Importamos desde los archivos originales para evitar duplicados
+// Importamos desde los archivos originales
 import { AuthProvider, useAuthContext } from '../AuthContext'; 
 import { AdminProvider } from '../AdminContext';
 import { MenuProvider } from '../MenuContext';
@@ -17,14 +17,16 @@ interface AppProvidersProps {
 const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
   const { user, loading } = useAuthContext();
 
-  if (loading) return null; // O un spinner
+  if (loading) return <div className="h-screen w-full bg-white" />; // Un simple placeholder mientras carga
+
+  // Normalizamos el rol para evitar errores de mayúsculas/minúsculas
+  const role = user?.role?.toLowerCase();
 
   // 1. Empezamos con el contenido base (el Router)
   let content = <>{children}</>;
 
   // 2. Providers de Cocina (Solo si es admin o cocina)
-  // Envuelven al contenido base
-  if (user?.role === 'admin' || user?.role === 'cocina') {
+  if (role === 'admin' || role === 'cocina') {
     content = (
       <KitchenProvider orderRepo={container.ordersRepo}>
         {content}
@@ -33,8 +35,7 @@ const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
   }
 
   // 3. Providers de Venta/Admin (Admin y Recepción)
-  // Envuelven a lo anterior (incluyendo cocina si aplica)
-  if (user?.role === 'admin' || user?.role === 'recepcion') {
+  if (role === 'admin' || role === 'recepcion') {
     content = (
       <OrderProvider>
         <POSProvider>
@@ -45,7 +46,7 @@ const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
   }
 
   // 4. Provider de Admin (SOLO Admin)
-  if (user?.role === 'admin') {
+  if (role === 'admin') {
     content = (
       <AdminProvider settingsRepo={container.systemSettingsRepo} rulesRepo={container.rulesRepo}>
         {content}
@@ -53,22 +54,22 @@ const RoleBasedProviders = ({ children }: { children: ReactNode }) => {
     );
   }
 
-  // 5. FINALMENTE: El MenuProvider envuelve a TODO lo demás.
-  // Esto asegura que POSProvider y KitchenProvider puedan acceder al Menú si lo necesitan,
-  // y que POSPage siempre encuentre el contexto, sin importar qué otros providers estén activos.
-  return (
-    <MenuProvider menuRepo={container.menuRepo} categoryRepo={container.categoryRepo}>
-       {content}
-    </MenuProvider>
-  );
+  // Devolvemos el contenido envuelto en los providers específicos de rol
+  return <>{content}</>;
 };
 
 export const AppProviders = ({ children }: AppProvidersProps) => {
   return (
     <AuthProvider>
-      <RoleBasedProviders>
-        {children}
-      </RoleBasedProviders>
+      {/* MOVIDO: El MenuProvider ahora envuelve todo de forma estable.
+        Esto garantiza que POSPage siempre tenga acceso al contexto, 
+        sin importar el estado de carga o el rol del usuario.
+      */}
+      <MenuProvider menuRepo={container.menuRepo} categoryRepo={container.categoryRepo}>
+        <RoleBasedProviders>
+          {children}
+        </RoleBasedProviders>
+      </MenuProvider>
     </AuthProvider>
   );
 };
