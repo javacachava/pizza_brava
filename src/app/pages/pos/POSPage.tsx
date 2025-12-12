@@ -3,35 +3,29 @@ import { useMenu } from '../../../hooks/useMenu';
 import { usePOSCommands } from '../../../hooks/usePOSCommands';
 import { useTables } from '../../../hooks/useTables';
 
-// Components UI
-import ProductGrid from './ProductGrid';
-import CartSidebar from './CartSidebar';
-import CategoryTabs from './CategoryTabs';
+// Components UI - Imports verificados con structure
+import { ProductGrid } from './ProductGrid';
+import CartSidebar from './CartSidebar'; // Ojo: CartSidebar suele ser default export
+import { CategoryTabs } from './CategoryTabs';
 import ProductDetailModal from './ProductDetailModal';
 import OrderTypeModal from './OrderTypeModal';
 import ComboSelectionModal from './ComboSelectionModal';
-import LoadingSpinner from '../../components/ui/LoadingSpinner'; // Asumiendo existencia o usar uno simple
 
 // Models
 import type { MenuItem } from '../../../models/MenuItem';
 import type { Combo } from '../../../models/Combo';
 
-/**
- * POSPage
- * Componente de UI Principal ("View").
- * Responsabilidad: Renderizar el estado y capturar eventos del usuario.
- * NO contiene lógica de negocio (cálculos, validaciones, manipulaciones de array).
- */
 const POSPage: React.FC = () => {
-  // 1. Hooks de Infraestructura (Datos)
+  // 1. Hooks de Infraestructura (Data Fetching)
+  // Ahora useMenu y useTables usan el container internamente si no se pasan args
   const { categories, products, combos, loading: menuLoading } = useMenu();
   const { tables } = useTables();
   
-  // 2. Hook de Aplicación (Lógica y Comandos)
+  // 2. Hook de Aplicación (Business Logic & Commands)
   const { cart, commands, isSubmitting } = usePOSCommands();
 
-  // 3. Estado Local (Solo para UI: Modales y Tabs)
-  const [selectedCategory, setSelectedCategory] = useState<string>('todos');
+  // 3. Estado Local (UI State only)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null); // null = 'Todos'
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modales
@@ -39,11 +33,11 @@ const POSPage: React.FC = () => {
   const [selectedCombo, setSelectedCombo] = useState<Combo | null>(null);
   const [isOrderTypeModalOpen, setIsOrderTypeModalOpen] = useState(false);
 
-  // --- Filtrado de Productos (UI Logic) ---
-  const filteredItems = useMemo(() => {
-    let items = selectedCategory === 'todos' 
-      ? products 
-      : products.filter(p => p.categoryId === selectedCategory);
+  // --- Lógica de Filtrado (UI Logic) ---
+  const filteredProducts = useMemo(() => {
+    let items = selectedCategory
+      ? products.filter(p => p.categoryId === selectedCategory)
+      : products;
 
     if (searchQuery) {
       const lowerQ = searchQuery.toLowerCase();
@@ -52,55 +46,76 @@ const POSPage: React.FC = () => {
     return items;
   }, [selectedCategory, products, searchQuery]);
 
-  // --- Filtrado de Combos (UI Logic) ---
+  // Filtramos combos si la categoría seleccionada es 'combos' o si no hay categoría (pantalla principal)
+  // Nota: Esto asume que tienes una categoría con id 'combos' en tu BD o quieres mostrarlos en 'Todos'.
   const filteredCombos = useMemo(() => {
-    if (selectedCategory !== 'combos' && selectedCategory !== 'todos') return [];
-    // Asumiendo que los combos se muestran cuando la categoría es 'combos' o 'todos'
-    // O si tienes una categoría específica en bootstrap.json llamada 'combos'
-    return combos; 
-  }, [selectedCategory, combos]);
+    // Si buscamos texto, buscar también en combos
+    if (searchQuery) {
+       const lowerQ = searchQuery.toLowerCase();
+       return combos.filter(c => c.name.toLowerCase().includes(lowerQ));
+    }
+    
+    // Lógica de visualización: Mostrar si categoria es null o 'combos'
+    if (!selectedCategory || selectedCategory === 'combos') {
+        return combos;
+    }
+    return [];
+  }, [selectedCategory, combos, searchQuery]);
 
 
-  if (menuLoading) return <div className="flex h-screen items-center justify-center"><p>Cargando menú...</p></div>;
+  if (menuLoading) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-gray-100">
+            <div className="animate-pulse text-orange-600 font-semibold">Cargando sistema POS...</div>
+        </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen w-full bg-gray-100 overflow-hidden">
+    <div className="flex h-screen w-full bg-gray-100 overflow-hidden font-sans">
       
-      {/* SECCIÓN IZQUIERDA: MENÚ Y PRODUCTOS */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      {/* --- PANEL IZQUIERDO: CATÁLOGO --- */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative mr-80"> {/* mr-80 para espacio del sidebar fijo */}
         
-        {/* Header / Buscador */}
-        <header className="bg-white p-4 shadow-sm z-10">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-xl font-bold text-gray-800">Pizza Brava POS</h1>
-            <input
-              type="text"
-              placeholder="Buscar producto..."
-              className="px-4 py-2 border rounded-lg w-1/3 focus:ring-2 focus:ring-orange-500 outline-none"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Header Fijo */}
+        <header className="bg-white px-6 py-4 shadow-sm z-10 border-b">
+          <div className="flex justify-between items-center mb-4 gap-4">
+            <h1 className="text-2xl font-black text-gray-800 tracking-tight hidden md:block">
+              Pizza<span className="text-orange-600">Brava</span>
+            </h1>
+            <div className="relative flex-1 max-w-md">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </span>
+                <input
+                type="text"
+                placeholder="Buscar producto o combo..."
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border-transparent focus:bg-white focus:border-orange-500 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
           </div>
           
-          {/* Categorías */}
+          {/* Tabs de Categorías */}
           <CategoryTabs 
             categories={categories}
-            selectedId={selectedCategory}
-            onSelect={setSelectedCategory}
+            active={selectedCategory}
+            onChange={setSelectedCategory}
           />
         </header>
 
-        {/* Grid de Productos */}
-        <main className="flex-1 overflow-y-auto p-4">
+        {/* Grid Scrollable */}
+        <main className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
           <ProductGrid 
-            products={filteredItems}
-            combos={selectedCategory === 'combos' || selectedCategory === 'todos' ? filteredCombos : []}
+            products={filteredProducts}
+            combos={filteredCombos}
             onProductClick={(prod) => {
+              // Si el producto es configurable (ingredientes, sabores, tamaños), abrir modal
               if (prod.usesIngredients || prod.usesFlavors || prod.usesSizeVariant) {
-                // Si requiere configuración, abrir modal
                 setSelectedProduct(prod);
               } else {
-                // Si es simple, agregar directo (Fast POS)
+                // Si es simple, comando directo
                 commands.addProductToCart(prod);
               }
             }}
@@ -109,7 +124,7 @@ const POSPage: React.FC = () => {
         </main>
       </div>
 
-      {/* SECCIÓN DERECHA: SIDEBAR CARRITO */}
+      {/* --- PANEL DERECHO: SIDEBAR CARRITO (Fixed) --- */}
       <CartSidebar 
         cart={cart}
         onIncrease={commands.increaseQuantity}
@@ -119,19 +134,16 @@ const POSPage: React.FC = () => {
         onProcess={() => setIsOrderTypeModalOpen(true)}
       />
 
-      {/* --- MODALES --- */}
+      {/* --- MODALES (Portals/Overlays) --- */}
 
-      {/* 1. Detalle de Producto (Ingredientes/Sabores) */}
+      {/* 1. Configuración de Producto */}
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onConfirm={(product, quantity, extras) => { // Ajustar firma según tu componente real
-             // Aquí asumimos que el modal devuelve el producto base o configurado
-             // Si tu modal maneja lógica compleja, idealmente debería devolver un objeto listo para commands.addOrderItem
-             // Por simplicidad en este ejemplo, llamamos al addProduct simple
-             commands.addProductToCart(product); 
+          onConfirm={(productWithOpts) => { 
+             commands.addProductToCart(productWithOpts); 
              setSelectedProduct(null);
           }}
         />
@@ -150,16 +162,16 @@ const POSPage: React.FC = () => {
         />
       )}
 
-      {/* 3. Tipo de Orden y Envío */}
+      {/* 3. Checkout / Tipo de Orden */}
       <OrderTypeModal 
         isOpen={isOrderTypeModalOpen}
         onClose={() => setIsOrderTypeModalOpen(false)}
         isLoading={isSubmitting}
-        tables={tables} // Pasamos mesas para el select
-        onConfirm={(type, meta) => {
-          commands.submitOrder(type, meta);
-          // El cierre del modal y limpieza ocurre en submitOrder tras éxito
-          if (!isSubmitting) setIsOrderTypeModalOpen(false); 
+        tables={tables}
+        onConfirm={async (type, meta) => {
+          await commands.submitOrder(type, meta);
+          // Si el comando fue exitoso (el carrito se vació), cerramos el modal
+          if (cart.length === 0) setIsOrderTypeModalOpen(false); 
         }}
       />
     </div>

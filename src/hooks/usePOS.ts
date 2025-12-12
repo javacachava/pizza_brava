@@ -1,4 +1,3 @@
-// src/hooks/usePOS.ts
 import { useState } from 'react';
 import { container } from '../models/di/container';
 import type { MenuItem } from '../models/MenuItem';
@@ -6,59 +5,37 @@ import type { OrderItem } from '../models/OrderItem';
 import { cartService } from '../services/domain/cartService';
 
 export function usePOS() {
-  const posService = container.posService; // tu servicio de dominio/infrastructure existente
-
+  const posService = container.posService;
   const [cart, setCart] = useState<OrderItem[]>([]);
 
+  // Mantiene la lógica original de posService para agregar productos complejos
   const addProduct = (product: MenuItem, quantity: number = 1, extras: number = 0) => {
-    // Delegamos a posService si tiene lógica de persistencia o a cartService si no.
-    if (posService && typeof posService.addProduct === 'function') {
-      setCart(prev => posService.addProduct(prev, product, quantity, extras));
-      return;
-    }
-    setCart(prev => cartService.addOrIncrement(prev, product, quantity, extras));
+    setCart(prev => posService.addProduct(prev, product, quantity, extras));
   };
 
   const addOrderItem = (item: OrderItem) => {
-    if (posService && typeof posService.addOrderItem === 'function') {
-      setCart(prev => posService.addOrderItem(prev, item));
-      return;
-    }
-    setCart(prev => [...prev, item]);
+    setCart(prev => posService.addOrderItem(prev, item));
   };
 
+  // NUEVO: Implementación de updateQuantity delegando al dominio
   const updateQuantity = (index: number, delta: number) => {
     setCart(prev => cartService.updateQuantity(prev, index, delta));
   };
 
-  const setItemQuantity = (index: number, newQty: number) => {
-    setCart(prev => cartService.setQuantity(prev, index, newQty));
-  };
-
   const removeIndex = (index: number) => {
-    if (posService && typeof posService.removeIndex === 'function') {
-      setCart(prev => posService.removeIndex(prev, index));
-      return;
-    }
-    setCart(prev => cartService.removeAt(prev, index));
+    setCart(prev => posService.removeIndex(prev, index));
   };
 
   const clear = () => {
-    if (posService && typeof posService.clear === 'function') {
-      setCart(prev => posService.clear());
-      return;
-    }
-    setCart([]);
+    setCart(posService.clear());
   };
 
   return {
     cart,
-    setCart, // expuesto para cases controlados (Commands puede usarlo)
     addProduct,
     addOrderItem,
-    updateQuantity,
-    setItemQuantity,
+    updateQuantity, // Exportamos la nueva función
     removeIndex,
-    clear
+    clear,
   };
 }

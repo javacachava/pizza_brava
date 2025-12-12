@@ -1,28 +1,19 @@
 import { useState } from 'react';
 import { usePOSContext } from '../contexts/POSContext';
-import { container } from '../models/di/container'; // Inyección de dependencias
+import { container } from '../models/di/container';
 import type { MenuItem } from '../models/MenuItem';
 import type { OrderItem } from '../models/OrderItem';
 import type { Order, OrderType } from '../models/Order';
 import { orderValidators } from '../utils/validators';
-import { toast } from 'react-hot-toast';
 import { generateId } from '../utils/id';
-import { Timestamp } from 'firebase/firestore'; // O tu wrapper de fecha
+import { toast } from 'react-hot-toast'; // Asegúrate de tener react-hot-toast instalado
 
-/**
- * usePOSCommands
- * Capa de Aplicación. Orquesta la lógica de negocio del POS.
- * Principio: La UI no debe saber cómo se crea una orden o se calcula un total.
- */
 export function usePOSCommands() {
   const { cart, addProduct, addOrderItem, updateQuantity, removeIndex, clear } = usePOSContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const ordersService = container.ordersService;
 
-  // Servicios inyectados (Infrastructure Layer)
-  const ordersService = container.ordersService; 
-  // const cashService = container.cashService; // Si se implementa control de caja
-
-  // --- Comandos de Carrito ---
+  // --- Commands ---
 
   const increaseQuantity = (index: number) => updateQuantity(index, 1);
 
@@ -31,8 +22,7 @@ export function usePOSCommands() {
     if (item && item.quantity > 1) {
       updateQuantity(index, -1);
     } else {
-      // Opcional: Confirmar eliminación si llega a 0, o dejar que el botón 'Eliminar' lo haga.
-      toast('Usa el botón eliminar para quitar el producto', { icon: 'ℹ️' });
+      toast('Usa el botón de eliminar para quitar el producto');
     }
   };
 
@@ -42,60 +32,52 @@ export function usePOSCommands() {
   };
 
   const addProductToCart = (product: MenuItem) => {
-    // Aquí podrías validar stock usando rules.enableStockManagement si fuera necesario
     addProduct(product, 1);
-    toast.success(`${product.name} agregado`);
+    toast.success('Producto agregado');
   };
 
   const addComboToCart = (comboItem: OrderItem) => {
-    // El combo ya viene construido desde el ComboBuilder (Domain Layer logic happens there)
     addOrderItem(comboItem);
-    toast.success('Combo agregado correctamente');
+    toast.success('Combo agregado');
   };
 
   const clearOrder = () => {
-    if (window.confirm('¿Estás seguro de limpiar la orden actual?')) {
-      clear();
-    }
+    if (confirm('¿Limpiar orden actual?')) clear();
   };
-
-  // --- Comando de Envío de Orden (Core Business Logic) ---
 
   const submitOrder = async (
     orderType: OrderType,
     meta: {
       tableId?: string | null;
-      tableName?: string; // Para display
+      tableName?: string;
       customerName?: string;
       phone?: string;
       address?: string;
       note?: string;
     }
   ) => {
-    // 1. Validación de Dominio
+    // 1. Validar
     const validation = orderValidators.validateOrder(cart, orderType, meta);
     if (!validation.isValid) {
-      toast.error(validation.error || 'Orden inválida');
+      toast.error(validation.error || 'Error de validación');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 2. Construcción del Objeto Orden (Data Mapping)
-      const total = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      // 2. Construir Objeto Orden
+      const total = cart.reduce((acc, item) => acc + item.totalPrice, 0);
       
       const newOrder: Order = {
-        id: generateId(), // O dejar que Firestore lo genere
-        items: [...cart], // Clonar para inmutabilidad
-        total: total,
-        subTotal: total, // Si hubiera impuestos, calcular aquí usando rules.taxRate
+        id: generateId(),
+        items: [...cart],
+        total,
+        subTotal: total, // Ajustar si manejas impuestos
         status: 'pendiente',
-        orderType: orderType,
-        createdAt: new Date() as any, // Ajustar según tu tipo Timestamp
-        
-        // Mapeo de campos según tipo
+        orderType,
+        createdAt: new Date() as any, // Ajuste de tipo según tu SharedTypes/Firebase
         tableNumber: meta.tableId || null,
-        customerName: meta.customerName || 'Cliente General',
+        customerName: meta.customerName || 'Cliente',
         meta: {
           note: meta.note,
           phone: meta.phone,
@@ -104,16 +86,15 @@ export function usePOSCommands() {
         }
       };
 
-      // 3. Persistencia (Infrastructure Layer)
+      // 3. Persistir
       await ordersService.createOrder(newOrder);
-
-      // 4. Feedback y Limpieza
-      toast.success('¡Orden enviada a cocina!');
+      
+      toast.success('Orden enviada correctamente');
       clear();
       
     } catch (error) {
-      console.error('Error enviando orden:', error);
-      toast.error('Error al guardar la orden. Intente de nuevo.');
+      console.error(error);
+      toast.error('Error al enviar la orden');
     } finally {
       setIsSubmitting(false);
     }
