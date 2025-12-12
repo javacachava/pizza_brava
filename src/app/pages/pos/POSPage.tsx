@@ -1,3 +1,4 @@
+// src/app/pages/pos/POSPage.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { useMenuContext } from '../../../contexts/MenuContext';
 import { usePOSContext } from '../../../contexts/POSContext';
@@ -7,9 +8,11 @@ import { container } from '../../../models/di/container';
 import { ProductGrid } from './ProductGrid';
 import { ProductDetailModal } from './ProductDetailModal';
 import { CategoryTabs } from './CategoryTabs';
-import { CartSidebar } from './CartSidebar';
+import CartSidebar from './CartSidebar';
 import { ComboSelectionModal } from './ComboSelectionModal';
 import { OrderTypeModal } from './OrderTypeModal';
+
+import { usePOSCommands } from '../../../hooks/usePOSCommands';
 
 import type { MenuItem } from '../../../models/MenuItem';
 import type { ComboDefinition } from '../../../models/ComboDefinition';
@@ -32,11 +35,14 @@ export const POSPage: React.FC = () => {
     cart,
     addProduct,
     addOrderItem,
+    updateQuantity,
     removeIndex,
     clear
   } = usePOSContext();
 
   const { createOrder, refresh: refreshOrders } = useOrderContext();
+
+  const { cart: commandsCart, commands } = usePOSCommands();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -77,11 +83,10 @@ export const POSPage: React.FC = () => {
 
   const handleAddProduct = (qty: number) => {
     if (!selectedProduct) return;
-    addProduct(selectedProduct, qty, 0);
+    commands.add(selectedProduct, qty, 0);
     setProductModalOpen(false);
   };
 
-  // ✔️ NUEVA VERSIÓN PROFESIONAL — crear OrderItem completo para combos
   const handleConfirmCombo = (selections: Record<string, string[]>) => {
     if (!selectedComboDef) return;
 
@@ -98,10 +103,11 @@ export const POSPage: React.FC = () => {
       totalPrice: comboInstance.price,
       isCombo: true,
       combo: comboInstance,
-      selectedOptions: [] // ← CORRECTO (era {} y fallaba)
+      selectedOptions: [],
+      comment: ''
     };
 
-    addOrderItem(comboOrderItem);
+    commands.addCombo(comboOrderItem);
 
     setComboModalOpen(false);
     setSelectedComboDef(null);
@@ -154,45 +160,9 @@ export const POSPage: React.FC = () => {
     }
   };
 
-  const handleIncrease = (productId?: string | null) => {
-    if (!productId) return;
-
-    const item = cart.find((c: OrderItem) => c.productId === productId);
-    if (!item) return;
-
-    if (!item.isCombo) {
-      const product = menuItems.find((mi: MenuItem) => mi.id === productId);
-      if (product) {
-        addProduct(product, 1, 0);
-        return;
-      }
-    }
-
-    addOrderItem({
-      ...item,
-      quantity: item.quantity + 1,
-      totalPrice: item.unitPrice * (item.quantity + 1)
-    });
-  };
-
-  const handleDecrease = (productId?: string | null) => {
-    if (!productId) return;
-    const idx = cart.findIndex((c: OrderItem) => c.productId === productId);
-    if (idx >= 0) removeIndex(idx);
-  };
-
-  const handleRemove = (productId?: string | null) => {
-    if (!productId) return;
-    let idx = cart.findIndex((c: OrderItem) => c.productId === productId);
-    while (idx >= 0) {
-      removeIndex(idx);
-      idx = cart.findIndex((c: OrderItem) => c.productId === productId);
-    }
-  };
-
   return (
-    <div className="min-h-screen flex">
-      <main className="flex-1 p-6">
+    <div className="min-h-screen flex bg-gray-50">
+      <main className="flex-1 p-6 mr-80"> {/* mr-80 para dejar espacio al sidebar fijo */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Punto de Venta</h1>
@@ -202,7 +172,7 @@ export const POSPage: React.FC = () => {
           <div className="text-right">
             <div className="text-sm text-gray-600">Items: {cart.length}</div>
             <div className="text-lg font-semibold">
-              {formatPrice(calculateCartTotal(cart))}
+              {formatPrice(cart.reduce((acc, it) => acc + (it.totalPrice ?? 0), 0))}
             </div>
           </div>
         </div>
@@ -240,9 +210,9 @@ export const POSPage: React.FC = () => {
 
       <CartSidebar
         cart={cart}
-        onIncrease={handleIncrease}
-        onDecrease={handleDecrease}
-        onRemove={handleRemove}
+        onIncrease={commands.increase}
+        onDecrease={commands.decrease}
+        onRemove={commands.remove}
         onSubmitOrder={handleOpenOrderType}
       />
 
@@ -294,3 +264,5 @@ export const POSPage: React.FC = () => {
     </div>
   );
 };
+
+export default POSPage;

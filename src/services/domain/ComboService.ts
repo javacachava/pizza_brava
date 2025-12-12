@@ -1,6 +1,8 @@
 import type { IComboRepository } from '../../repos/interfaces/IComboRepository';
 import type { IComboDefinitionRepository } from '../../repos/interfaces/IComboDefinitionRepository';
-import type { ComboDefinition, Combo } from '../../models/Combo';
+import type { ComboDefinition} from '../../models/ComboDefinition';
+import type { Combo } from '../../models/Combo';
+
 
 export class ComboService {
   private comboRepo: IComboRepository;
