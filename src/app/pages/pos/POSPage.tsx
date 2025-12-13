@@ -1,141 +1,99 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useMenu } from '../../../hooks/useMenu';
-import { usePOSCommands } from '../../../hooks/usePOSCommands';
-import { useTables } from '../../../hooks/useTables';
+import React, { useState } from 'react';
+import { useMenuContext } from '@/contexts/MenuContext'; // Tu context existente
+import { Product } from '@/models/ProductTypes';
+import { ProductSelectionModal } from '@/app/components/modals/ProductSelectionModal';
 
-import { ProductGrid } from './ProductGrid';
-import { CartSidebar } from './CartSidebar';
-import { CategoryTabs } from './CategoryTabs';
-import { ProductDetailModal } from './ProductDetailModal';
-import { OrderTypeModal } from './OrderTypeModal';
-import { ComboSelectionModal } from './ComboSelectionModal';
+const CATEGORIES = [
+  { id: 'all', label: 'Todo' },
+  { id: 'combos', label: 'Combos' },
+  { id: 'pizzas', label: 'Pizzas' },
+  { id: 'bebidas', label: 'Bebidas' },
+  { id: 'frozen', label: 'Frozen' },
+];
 
-import type { MenuItem } from '../../../models/MenuItem';
-import type { ComboDefinition } from '../../../models/ComboDefinition';
-import type { OrderType } from '../../../models/Order';
-
-export const POSPage: React.FC = () => {
-  // Obtenemos flavors del hook useMenu actualizado
-  const { categories, products, combos, flavors, loading: menuLoading } = useMenu();
-  const { tables } = useTables();
-  const { cart, commands, isSubmitting } = usePOSCommands();
-
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+export const POSPage = () => {
+  const { products } = useMenuContext(); // Asumo que esto trae los productos
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   
-  const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
-  const [selectedCombo, setSelectedCombo] = useState<ComboDefinition | null>(null);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  // Estado para manejar el modal
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
-  useEffect(() => {
-    if (!menuLoading && categories.length > 0 && !selectedCategory) {
-      setSelectedCategory(categories[0].id);
-    }
-  }, [categories, menuLoading, selectedCategory]);
-
-  const filteredProducts = useMemo(() => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return products.filter(p => p.name.toLowerCase().includes(q));
-    }
-    if (!selectedCategory) return [];
-    return products.filter(p => p.categoryId === selectedCategory);
-  }, [selectedCategory, products, searchQuery]);
-
-  const filteredCombos = useMemo(() => {
-    if (searchQuery) {
-       const q = searchQuery.toLowerCase();
-       return combos.filter(c => c.name.toLowerCase().includes(q));
-    }
-    if (selectedCategory === 'combos') {
-        return combos;
-    }
-    return [];
-  }, [selectedCategory, combos, searchQuery]);
-
-  if (menuLoading) return <div className="p-10 text-center">Cargando...</div>;
+  // Lógica de Filtrado
+  const filteredProducts = products.filter(p => {
+    const matchesCategory = selectedCategory === 'all' || p.categoryId === selectedCategory;
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
-    <div className="flex h-screen w-full bg-gray-100 overflow-hidden font-sans">
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative mr-80">
-        <header className="bg-white px-6 pt-4 pb-2 shadow-sm z-10 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4 gap-4">
-            <h1 className="text-2xl font-black text-gray-800 hidden lg:block">Pizza Brava</h1>
-            <div className="relative flex-1 max-w-lg">
-              <input
-                className="w-full px-4 py-2.5 bg-gray-100 rounded-xl border-transparent focus:bg-white focus:border-orange-500 outline-none transition-all"
-                placeholder="Buscar..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
+    <div className="min-h-screen bg-[#121212] text-white flex flex-col p-4 md:p-6 gap-6">
+      
+      {/* HEADER: Buscador y Categorías */}
+      <header className="flex flex-col md:flex-row gap-4 justify-between items-center sticky top-0 z-10 bg-[#121212]/95 backdrop-blur py-2">
+        
+        {/* Buscador Estilo Google Glass */}
+        <div className="relative w-full md:w-1/3">
+          <input 
+            type="text" 
+            placeholder="Buscar producto..." 
+            className="w-full bg-[#1E1E1E] border border-[#333] rounded-full py-3 px-12 text-white focus:outline-none focus:border-[#FF5722] transition-colors"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <span className="absolute left-4 top-3.5 text-gray-500">🔍</span>
+        </div>
+
+        {/* Tabs de Categoría */}
+        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`
+                whitespace-nowrap px-6 py-2 rounded-full font-bold text-sm transition-all
+                ${selectedCategory === cat.id 
+                  ? 'bg-[#FF5722] text-white shadow-[0_0_15px_rgba(255,87,34,0.4)]' 
+                  : 'bg-[#1E1E1E] text-gray-400 hover:bg-[#2A2A2A] hover:text-white'}
+              `}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* GRID DE PRODUCTOS */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {filteredProducts.map((product) => (
+          <div 
+            key={product.id}
+            onClick={() => setProductToEdit(product)} // ABRIR MODAL
+            className="group bg-[#1E1E1E] rounded-2xl overflow-hidden cursor-pointer border border-transparent hover:border-[#FF5722] transition-all hover:-translate-y-1 shadow-lg"
+          >
+            {/* Imagen */}
+            <div className="h-40 overflow-hidden relative">
+               <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+               <div className="absolute inset-0 bg-gradient-to-t from-[#1E1E1E] to-transparent opacity-60" />
+            </div>
+            
+            {/* Info */}
+            <div className="p-4">
+              <h3 className="font-bold text-lg leading-tight mb-1">{product.name}</h3>
+              <p className="text-[#FF5722] font-bold text-xl">${product.price.toFixed(2)}</p>
             </div>
           </div>
-          <CategoryTabs categories={categories} active={selectedCategory} onChange={setSelectedCategory} />
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
-          <ProductGrid 
-            products={filteredProducts}
-            combos={filteredCombos}
-            onProductClick={(prod) => {
-              // Ahora Frozen entra aquí porque usesFlavors=true
-              if (prod.usesIngredients || prod.usesFlavors || prod.usesSizeVariant) {
-                setSelectedProduct(prod);
-              } else {
-                commands.addProductToCart(prod);
-              }
-            }}
-            onComboClick={setSelectedCombo}
-          />
-        </main>
+        ))}
       </div>
 
-      <CartSidebar 
-        cart={cart}
-        onIncrease={commands.increaseQuantity}
-        onDecrease={commands.decreaseQuantity}
-        onRemove={commands.removeItem}
-        onClear={commands.clearOrder}
-        onProcess={() => setIsCheckoutOpen(true)}
-      />
-
-      {/* --- MODALES --- */}
-
-      {selectedProduct && (
-        <ProductDetailModal
-          product={selectedProduct}
-          allFlavors={flavors} // <--- Pasamos los sabores cargados
-          isOpen={!!selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onConfirm={(product, qty, notes, options) => {
-             // Pasamos options (sabor seleccionado) al comando
-             commands.addProductToCart(product, qty, notes, options);
-             setSelectedProduct(null);
-          }}
-        />
-      )}
-
-      {selectedCombo && (
-        <ComboSelectionModal
-          combo={selectedCombo}
-          isOpen={!!selectedCombo}
-          onClose={() => setSelectedCombo(null)}
-          onConfirm={(comboItem) => {
-            commands.addComboToCart(comboItem);
-            setSelectedCombo(null);
-          }}
-          products={products}
-        />
-      )}
-
-      <OrderTypeModal 
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        isLoading={isSubmitting}
-        tables={tables}
-        onConfirm={async (type, meta) => {
-          await commands.submitOrder(type, meta);
-          if (cart.length === 0) setIsCheckoutOpen(false);
+      {/* MODAL DE SELECCIÓN */}
+      <ProductSelectionModal 
+        isOpen={!!productToEdit} 
+        onClose={() => setProductToEdit(null)} 
+        product={productToEdit}
+        onAddToCart={(item) => {
+           console.log("Agregado al carrito:", item);
+           // Aquí llamarías a tu cartService.addItem(item)
         }}
       />
     </div>
