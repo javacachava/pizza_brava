@@ -6,7 +6,7 @@ import { useTables } from '../../../hooks/useTables';
 // Modelos
 import type { MenuItem } from '../../../models/MenuItem';
 import type { ProductUI, ProductBehavior, ComboSlot as UIComboSlot, ComboOption } from '../../../models/ProductTypes';
-import type { ComboDefinition, ComboSlot as DBComboSlot } from '../../../models/ComboDefinition';
+import type { ComboDefinition } from '../../../models/ComboDefinition';
 
 // Utils
 import { CategoryThemeFactory } from '../../../utils/CategoryThemeFactory';
@@ -18,8 +18,6 @@ import { OrderTypeModal } from './OrderTypeModal';
 import { ProductGrid } from './ProductGrid';
 
 // --- SUB-COMPONENTE LOCAL: Botón de Categoría ---
-// (Definido antes para evitar problemas de hoisting si fuera func expr const, aunque function decl es hoisted. 
-//  Lo movemos arriba por limpieza)
 const CategoryButton = ({ id, name, isActive, onClick }: { id: string, name: string, isActive: boolean, onClick: () => void }) => {
   const theme = CategoryThemeFactory.getTheme(name || id);
   
@@ -71,13 +69,11 @@ export const POSPage = () => {
   };
 
   const convertComboToUI = (combo: ComboDefinition): ProductUI => {
-    // 1. Mapeo inicial de slots (sin hidratar opciones aún)
+    // 1. Mapeo inicial de slots
     const rawSlots = combo.slots || [];
     
     // 2. Hidratación de slots con productos reales
-    //    DBComboSlot tiene allowedProductIds, necesitamos convertir eso a UIComboSlot.options (ComboOption[])
     const hydratedSlots: UIComboSlot[] = rawSlots.map(dbSlot => {
-        // Encontrar los productos reales en el menú general
         const validOptions: ComboOption[] = (items || [])
             .filter(item => dbSlot.allowedProductIds.includes(item.id))
             .map(item => ({
@@ -90,10 +86,10 @@ export const POSPage = () => {
         return {
             id: dbSlot.id,
             title: dbSlot.name,
-            isRequired: dbSlot.required === true || dbSlot.required === 'required', // Normalizamos a booleano
-            isSwappable: true, // Asumimos true salvo que DB diga lo contrario (no visible en DBComboSlot)
+            isRequired: dbSlot.required === true || dbSlot.required === 'required',
+            isSwappable: true,
             options: validOptions,
-            defaultOptionId: validOptions[0]?.id || '' // Fallback al primero
+            defaultOptionId: validOptions[0]?.id || ''
         };
     });
 
@@ -101,19 +97,16 @@ export const POSPage = () => {
       id: combo.id,
       name: combo.name,
       price: combo.price,
-      categoryId: 'combos', // Categoría virtual para UI
+      categoryId: 'combos',
       description: combo.description,
       behavior: 'COMBO_PACK',
       isActive: combo.isAvailable,
-      code: `CMB-${combo.id}`, // Generamos código si falta
+      code: `CMB-${combo.id}`,
       comboConfig: { slots: hydratedSlots },
-      
-      // Propiedades requeridas por MenuItem / ProductUI
       usesIngredients: false,
       usesFlavors: false,
       comboEligible: true, 
       isAlcoholic: false,
-      // Si MenuItem requiere más campos, añadir defaults aquí
       isAvailable: combo.isAvailable, 
       createdAt: undefined, 
       updatedAt: undefined 
@@ -128,7 +121,6 @@ export const POSPage = () => {
     const isComboCat = selectedCategoryId === 'combos';
 
     const fProducts = (items || []).filter(p => {
-      // Si la categoría seleccionada es Combos, no mostramos productos normales
       if (isComboCat) return false;
       const matchCat = isAll || p.categoryId === selectedCategoryId;
       const matchSearch = (p.name || '').toLowerCase().includes(term);
@@ -136,7 +128,6 @@ export const POSPage = () => {
     });
 
     const fCombos = (combos || []).filter(c => {
-      // Combos se ven en 'Todo' o en su tab específica
       const matchCat = isAll || isComboCat;
       const matchSearch = (c.name || '').toLowerCase().includes(term);
       return matchCat && matchSearch;
@@ -172,21 +163,18 @@ export const POSPage = () => {
     );
   }
 
-  // Pre-fetch temas para botones estáticos para evitar llamar factory en render
-  // (Aunque es ligero, es buena práctica si fuera pesado. En este caso CategoryButton lo maneja)
-
   return (
-    <div className="flex h-screen w-full bg-[#0F0F0F] text-gray-100 overflow-hidden font-sans selection:bg-[#FF5722] selection:text-white">
+    // ESTRUCTURA PRINCIPAL FLEXIBLE Y SIN SCROLL EN EL BODY
+    <div className="flex h-screen w-full bg-[#0F0F0F] text-gray-100 overflow-hidden font-sans selection:bg-[#FF5722] selection:text-white relative">
       
-      {/* COL 1: SIDEBAR CATEGORÍAS */}
-      <nav className="w-[85px] md:w-[90px] lg:w-[110px] flex flex-col items-center py-4 md:py-6 bg-[#161616] border-r border-[#2A2A2A] z-20 shadow-2xl h-full overflow-y-auto no-scrollbar scrollbar-hide">
+      {/* COL 1: SIDEBAR CATEGORÍAS (Izquierda) */}
+      <nav className="w-[85px] md:w-[90px] lg:w-[110px] flex-shrink-0 flex flex-col items-center py-4 md:py-6 bg-[#161616] border-r border-[#2A2A2A] z-30 shadow-2xl h-full overflow-y-auto no-scrollbar scrollbar-hide">
         
         {/* Logo / Botón Home */}
         <div 
           className="mb-6 md:mb-8 p-2 md:p-3 rounded-2xl bg-gradient-to-br from-[#FF5722] to-[#D84315] shadow-lg shadow-orange-900/30 transform hover:scale-105 transition-transform cursor-pointer"
           onClick={() => setSelectedCategoryId('all')}
         >
-           {/* Renderizamos icono directo aquí o usamos un CategoryButton para 'all' si queremos consistencia visual */}
            {CategoryThemeFactory.getTheme('all').icon}
         </div>
 
@@ -217,10 +205,12 @@ export const POSPage = () => {
         </div>
       </nav>
 
-      {/* COL 2: GRID DE PRODUCTOS */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#0F0F0F]">
-        {/* Header Compacto */}
-        <header className="h-16 md:h-20 min-h-[4rem] border-b border-[#2A2A2A] bg-[#161616]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-10 sticky top-0">
+      {/* COL 2: GRID DE PRODUCTOS (Centro) */}
+      {/* 'flex-1' para ocupar el espacio restante, 'relative' para z-index, 'z-0' para estar al fondo */}
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#0F0F0F] z-0">
+        
+        {/* HEADER STICKY: Se queda fijo arriba y tiene z-20 para tapar el contenido al scrollear */}
+        <header className="h-16 md:h-20 min-h-[4rem] border-b border-[#2A2A2A] bg-[#161616]/95 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-20 sticky top-0 shadow-sm">
           <div className="hidden md:block">
             <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Menú</h1>
           </div>
@@ -237,8 +227,8 @@ export const POSPage = () => {
           </div>
         </header>
 
-        {/* Grid SCROLLABLE */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 scrollbar-thin scrollbar-thumb-[#333]">
+        {/* Grid SCROLLABLE: Contenido principal */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 scrollbar-thin scrollbar-thumb-[#333] z-0 pb-32 md:pb-8">
             <ProductGrid 
               products={filteredProducts}
               combos={filteredCombos}
@@ -248,15 +238,18 @@ export const POSPage = () => {
         </div>
       </main>
 
-      {/* COL 3: CART SIDEBAR */}
-      <CartSidebar 
-        cart={cart}
-        onIncrease={commands.increaseQuantity}
-        onDecrease={commands.decreaseQuantity}
-        onClear={commands.clearOrder}
-        onProcess={() => setIsProcessModalOpen(true)}
-        onRemove={commands.removeItem}
-      />
+      {/* COL 3: CART SIDEBAR (Derecha) */}
+      {/* Contenedor flexible para el carrito, evita que sea 'fixed' sobre el contenido */}
+      <div className="flex-shrink-0 z-30 h-full bg-[#161616] border-l border-[#2A2A2A]">
+        <CartSidebar 
+          cart={cart}
+          onIncrease={(index) => commands.increaseQuantity(index)}
+          onDecrease={(index) => commands.decreaseQuantity(index)}
+          onRemove={(index) => commands.removeItem(index)}
+          onClear={commands.clearOrder}
+          onProcess={() => setIsProcessModalOpen(true)}
+        />
+      </div>
 
       {/* MODALES */}
       <ProductSelectionModal 
