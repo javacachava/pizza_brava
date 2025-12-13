@@ -11,13 +11,17 @@ interface Props {
 }
 
 export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
-  const isCombo = type === 'COMBO';
+  // Lógica Estricta para Visualización de Combo
+  // Se considera combo SOLO si viene de la tabla de combos (type='COMBO') 
+  // O si su categoría es explícitamente 'combos'.
+  // IGNORAMOS comboEligible para la UI.
+  const isCombo = type === 'COMBO' || (item as MenuItem).categoryId === 'combos';
   
-  // Obtenemos el tema
+  // Obtenemos el tema basado en categoría real
   const categoryKey = isCombo ? 'combos' : (item as MenuItem).categoryId || 'all';
   const theme = CategoryThemeFactory.getTheme(String(categoryKey));
   
-  // Extraemos el componente Icono del tema para renderizarlo como componente
+  // Icono dinámico
   const IconComponent = theme.icon;
 
   return (
@@ -31,7 +35,6 @@ export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
         hover:border-opacity-50 hover:shadow-2xl hover:-translate-y-1
         active:scale-[0.98]
       `}
-      // Aplicamos el color del borde dinámico en hover
       style={{ borderColor: 'rgba(255,255,255,0.1)' }} 
     >
       {/* 1. ÍCONO DECORATIVO (Top Right) */}
@@ -41,26 +44,19 @@ export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
           absolute top-4 right-4
           w-16 h-16
           opacity-20 group-hover:opacity-30 transition-opacity duration-500
-          /* Truco para gradiente en SVG: en Lucide a veces es mejor usar color directo 
-             o envolver en un div con mask, pero bg-clip-text funciona en texto/fuentes. 
-             Para SVG Lucide, usaremos el color del texto del tema. */
-          ${theme.textColor}
+          ${theme.textColor} 
         `}
       />
-      
-      {/* Opción B: Si quieres GRADIENTE REAL en el ícono SVG (avanzado):
-          Envolvemos en un div y usamos mix-blend-overlay o similar, 
-          pero para simplicidad y consistencia, el color sólido del tema (ej. Sky-400) 
-          con baja opacidad se ve muy elegante y "neon".
-      */}
 
-      {/* 2. CONTENIDO SUPERIOR (Nombre) */}
+      {/* 2. CONTENIDO SUPERIOR */}
       <div className="z-10 w-full pr-12 text-left">
         <h3 className="text-white text-lg font-bold leading-tight line-clamp-2 group-hover:text-white/90">
           {item.name}
         </h3>
+        
+        {/* BADGE COMBO (Solo si es realmente un combo) */}
         {isCombo && (
-          <span className="inline-block mt-1 text-[10px] font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded">
+          <span className="inline-block mt-1 text-[10px] font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded shadow-sm border border-orange-500/20">
             COMBO
           </span>
         )}
@@ -73,7 +69,7 @@ export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
         </p>
 
         <div className="flex items-center justify-between">
-          {/* Precio con el color de la categoría (ej. Azul para bebidas) */}
+          {/* Precio con color de categoría (ej. Azul para bebidas) */}
           <span className={`text-2xl font-bold tracking-tight ${theme.textColor}`}>
             ${item.price.toFixed(2)}
           </span>
@@ -94,7 +90,7 @@ export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
         </div>
       </div>
       
-      {/* Efecto de Brillo Sutil en Hover */}
+      {/* Efecto de Brillo Sutil */}
       <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
     </button>
   );

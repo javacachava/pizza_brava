@@ -17,8 +17,7 @@ import { CartSidebar } from './CartSidebar';
 import { OrderTypeModal } from './OrderTypeModal';
 import { ProductGrid } from './ProductGrid';
 
-// --- SUB-COMPONENTE LOCAL: Botón de Categoría ---
-// --- SUB-COMPONENTE LOCAL: Botón de Categoría ---
+// 1. Fix CategoryButton: Remove shadowColor
 const CategoryButton = ({ id, name, isActive, onClick }: { id: string, name: string, isActive: boolean, onClick: () => void }) => {
   const theme = CategoryThemeFactory.getTheme(name || id);
   const IconComponent = theme.icon;
@@ -34,7 +33,7 @@ const CategoryButton = ({ id, name, isActive, onClick }: { id: string, name: str
       `}
     >
       <div className={`text-xl md:text-2xl transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-        <IconComponent size={24} />
+        {IconComponent && <IconComponent size={24} />}
       </div>
       <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-center leading-tight truncate w-full px-1">
         {name}
@@ -42,6 +41,7 @@ const CategoryButton = ({ id, name, isActive, onClick }: { id: string, name: str
     </button>
   );
 };
+
 
 export const POSPage = () => {
   const { items, categories, combos, loading } = useMenuContext(); 
@@ -53,18 +53,23 @@ export const POSPage = () => {
   const [productToConfig, setProductToConfig] = useState<ProductUI | null>(null);
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
 
-  // --- LOGICA DE ADAPTACIÓN ---
+  // --- LOGICA DE ADAPTACIÓN CORREGIDA ---
   
   const convertProductToUI = (item: MenuItem): ProductUI => {
     let behavior: ProductBehavior = 'STANDARD';
-    if (item.comboEligible) behavior = 'COMBO_PACK';
+
+    // CORRECCIÓN CRÍTICA:
+    // comboEligible = true NO significa que sea un combo. Solo significa que cabe DENTRO de uno.
+    // Solo si categoryId es 'combos' es un COMBO_PACK real.
+    if (item.categoryId === 'combos') behavior = 'COMBO_PACK';
     else if (item.usesIngredients) behavior = 'CUSTOM_BUILDER';
     else if (item.usesFlavors) behavior = 'SIMPLE_VARIANT';
 
     return {
       ...item,
       behavior,
-      comboConfig: item.comboEligible ? { slots: [] } : undefined, 
+      // Solo inicializamos configuraciones si el comportamiento lo dicta
+      comboConfig: behavior === 'COMBO_PACK' ? { slots: [] } : undefined, 
       builderConfig: item.usesIngredients ? { ingredients: [] } : undefined,
       variantConfig: item.usesFlavors ? { groups: [] } : undefined,
     };
@@ -99,7 +104,7 @@ export const POSPage = () => {
       id: combo.id,
       name: combo.name,
       price: combo.price,
-      categoryId: 'combos',
+      categoryId: 'combos', // Categoría virtual explicita
       description: combo.description,
       behavior: 'COMBO_PACK',
       isActive: combo.isAvailable,
@@ -123,7 +128,9 @@ export const POSPage = () => {
     const isComboCat = selectedCategoryId === 'combos';
 
     const fProducts = (items || []).filter(p => {
+      // Si la categoría seleccionada es Combos, NO mostramos productos sueltos
       if (isComboCat) return false;
+      
       const matchCat = isAll || p.categoryId === selectedCategoryId;
       const matchSearch = (p.name || '').toLowerCase().includes(term);
       return matchCat && matchSearch;
@@ -142,8 +149,12 @@ export const POSPage = () => {
 
   const handleProductClick = (item: MenuItem) => {
     const uiProduct = convertProductToUI(item);
-    if (uiProduct.behavior !== 'STANDARD') setProductToConfig(uiProduct);
-    else commands.addProductToCart(item);
+    // Solo abrimos modal si NO es estándar
+    if (uiProduct.behavior !== 'STANDARD') {
+        setProductToConfig(uiProduct);
+    } else {
+        commands.addProductToCart(item);
+    }
   };
 
   const handleComboClick = (combo: ComboDefinition) => {
@@ -166,10 +177,9 @@ export const POSPage = () => {
   }
 
   return (
-    // ESTRUCTURA PRINCIPAL FLEXIBLE Y SIN SCROLL EN EL BODY
     <div className="flex h-screen w-full bg-[#0F0F0F] text-gray-100 overflow-hidden font-sans selection:bg-[#FF5722] selection:text-white relative">
       
-      {/* COL 1: SIDEBAR CATEGORÍAS (Izquierda) */}
+      {/* COL 1: SIDEBAR CATEGORÍAS */}
       <nav className="w-[85px] md:w-[90px] lg:w-[110px] flex-shrink-0 flex flex-col items-center py-4 md:py-6 bg-[#161616] border-r border-[#2A2A2A] z-30 shadow-2xl h-full overflow-y-auto no-scrollbar scrollbar-hide">
         
         {/* Logo / Botón Home */}
@@ -177,10 +187,8 @@ export const POSPage = () => {
           className="mb-6 md:mb-8 p-2 md:p-3 rounded-2xl bg-gradient-to-br from-[#FF5722] to-[#D84315] shadow-lg shadow-orange-900/30 transform hover:scale-105 transition-transform cursor-pointer"
           onClick={() => setSelectedCategoryId('all')}
         >
-           {(() => {
-              const HomeIcon = CategoryThemeFactory.getTheme('all').icon;
-              return <HomeIcon size={24} className="text-white" />;
-           })()}
+           {/* Icono Home */}
+           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
         </div>
 
         <div className="flex flex-col gap-3 md:gap-4 w-full px-2 md:px-3 pb-6">
@@ -210,11 +218,10 @@ export const POSPage = () => {
         </div>
       </nav>
 
-      {/* COL 2: GRID DE PRODUCTOS (Centro) */}
-      {/* 'flex-1' para ocupar el espacio restante, 'relative' para z-index, 'z-0' para estar al fondo */}
+      {/* COL 2: GRID DE PRODUCTOS */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#0F0F0F] z-0">
         
-        {/* HEADER STICKY: Se queda fijo arriba y tiene z-20 para tapar el contenido al scrollear */}
+        {/* Header */}
         <header className="h-16 md:h-20 min-h-[4rem] border-b border-[#2A2A2A] bg-[#161616]/95 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-20 sticky top-0 shadow-sm">
           <div className="hidden md:block">
             <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Menú</h1>
@@ -232,7 +239,7 @@ export const POSPage = () => {
           </div>
         </header>
 
-        {/* Grid SCROLLABLE: Contenido principal */}
+        {/* Grid SCROLLABLE */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 scrollbar-thin scrollbar-thumb-[#333] z-0 pb-32 md:pb-8">
             <ProductGrid 
               products={filteredProducts}
@@ -243,14 +250,13 @@ export const POSPage = () => {
         </div>
       </main>
 
-      {/* COL 3: CART SIDEBAR (Derecha) */}
-      {/* Contenedor flexible para el carrito, evita que sea 'fixed' sobre el contenido */}
+      {/* COL 3: CART SIDEBAR */}
       <div className="flex-shrink-0 z-30 h-full bg-[#161616] border-l border-[#2A2A2A]">
         <CartSidebar 
           cart={cart}
-          onIncrease={(index) => commands.increaseQuantity(index)}
-          onDecrease={(index) => commands.decreaseQuantity(index)}
-          onRemove={(index) => commands.removeItem(index)}
+          onIncrease={(index) => commands.increaseQuantity(Number(index))}
+          onDecrease={(index) => commands.decreaseQuantity(Number(index))}
+          onRemove={(index) => commands.removeItem(Number(index))}
           onClear={commands.clearOrder}
           onProcess={() => setIsProcessModalOpen(true)}
         />
@@ -270,7 +276,6 @@ export const POSPage = () => {
         isLoading={isSubmitting}
         tables={tables}
         onConfirm={(type, meta) => {
-          // Mapeo de UI Type ('comer_aqui') a Domain Type ('mesa')
           const domainType = type === 'comer_aqui' ? 'mesa' : type;
           commands.submitOrder(domainType, meta).then(() => {
              if(cart.length === 0) setIsProcessModalOpen(false);
