@@ -21,25 +21,26 @@ export const ProductGrid: React.FC<Props> = ({
 
   if (!hasItems) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50 min-h-[400px]">
-        <svg className="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50 min-h-[300px]">
+        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
-        <p className="text-xl font-medium">No hay productos aquí</p>
+        <p className="text-lg font-medium">No hay productos disponibles</p>
       </div>
     );
   }
 
   return (
-    /* AJUSTE TABLET: 
-       - sm (Móvil grande): 2 columnas
-       - md (Tablet Vertical): 3 columnas
-       - lg (Tablet Horizontal/Laptop): 4 columnas
-       - xl (Desktop): 5 columnas
-       Gap aumentado a gap-4 o gap-5 para mejor separación táctil 
-    */
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 pb-24">
+    // Grid Responsivo Ajustado para Tablet:
+    // - Móvil (por defecto): 1 columna o 2 pequeñas
+    // - sm (640px): 2 columnas
+    // - md (768px - Tablet Vertical): 2 columnas anchas
+    // - lg (1024px - Tablet Horizontal): 3 columnas
+    // - xl (1280px): 4 columnas
+    // Gap aumentado (gap-4 a gap-5) para separar mejor visualmente.
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 pb-24">
       
+      {/* Combos primero */}
       {combos.map((combo) => (
         <ProductCard
           key={`combo-${combo.id}`}
@@ -49,6 +50,7 @@ export const ProductGrid: React.FC<Props> = ({
         />
       ))}
 
+      {/* Productos después */}
       {products.map((product) => (
         <ProductCard
           key={`prod-${product.id}`}

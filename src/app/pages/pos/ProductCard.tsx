@@ -1,7 +1,7 @@
 import React from 'react';
 import type { MenuItem } from '../../../models/MenuItem';
 import type { ComboDefinition } from '../../../models/ComboDefinition';
-import { CategoryThemeFactory } from '../../../utils/CategoryThemeFactory'; //
+import { CategoryThemeFactory } from '../../../utils/CategoryThemeFactory';
 
 interface Props {
   item: MenuItem | ComboDefinition;
@@ -12,80 +12,79 @@ interface Props {
 export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
   const isCombo = type === 'COMBO';
   
-  // Determinamos el tema basado en el tipo o la categoría del ítem
-  // Si es producto, usamos su categoryId, si es combo, forzamos 'combos'
+  // Obtenemos el tema (colores e icono)
   const categoryKey = isCombo ? 'combos' : (item as MenuItem).categoryId || 'all';
   const theme = CategoryThemeFactory.getTheme(String(categoryKey));
-
-  const renderImage = () => {
-    // Usamos el icono de la factoría si no hay imagen
-    return (
-      <div className={`
-        w-full h-full flex items-center justify-center text-5xl md:text-6xl 
-        text-white drop-shadow-lg transition-transform duration-500 group-hover:scale-110
-      `}>
-        {theme.icon}
-      </div>
-    );
-  };
 
   return (
     <button 
       onClick={onClick}
       className={`
-        group relative w-full flex flex-col text-left
+        group relative w-full h-36 md:h-40 flex flex-col text-left
         bg-[#1E1E1E] rounded-2xl border border-[#333] overflow-hidden
         transition-all duration-300
-        hover:border-transparent hover:ring-2
-        active:scale-[0.98]
-        h-56 md:h-64 lg:h-72 shadow-lg hover:shadow-2xl
+        hover:border-transparent hover:ring-2 hover:shadow-2xl
+        active:scale-[0.97]
       `}
-      // Aplicamos el color de acento al borde/ring en hover dinámicamente
+      // El anillo de color al hacer hover tomará el color de la categoría
       style={{ '--tw-ring-color': theme.accentColor } as React.CSSProperties}
     >
-      {/* 1. Área de Imagen con Gradiente Dinámico */}
-      <div className={`
-        h-32 md:h-40 w-full relative overflow-hidden bg-gradient-to-br ${theme.gradient}
-      `}>
-        {/* Patrón o superposición suave */}
-        <div className="absolute inset-0 bg-black/10 z-0" />
+      
+      {/* 1. CAPA DE CONTENIDO (Texto y Precio) - Z-Index superior */}
+      <div className="relative z-10 p-4 flex flex-col justify-between h-full w-full">
         
-        <div className="relative z-10 w-full h-full">
-            {renderImage()}
-        </div>
-
-        {/* Badge de Combo */}
-        {isCombo && (
-          <span className="absolute top-2 right-2 z-20 bg-white/90 text-black text-[10px] font-bold px-2 py-1 rounded-full shadow-sm backdrop-blur-sm">
-            COMBO
-          </span>
-        )}
-      </div>
-
-      {/* 2. Área de Contenido */}
-      <div className="flex-1 p-3 md:p-4 flex flex-col justify-between bg-[#1E1E1E]">
-        <div>
-          <h3 className="text-gray-100 font-bold text-sm md:text-base leading-tight line-clamp-2 group-hover:text-white transition-colors">
+        {/* Header: Nombre y Badge Combo */}
+        <div className="flex justify-between items-start gap-2">
+          <h3 className="text-white font-bold text-sm md:text-base leading-tight line-clamp-2 pr-8 group-hover:text-white/90 transition-colors">
             {item.name}
           </h3>
+          {isCombo && (
+            <span className="flex-shrink-0 bg-[#FF5722] text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide">
+              Combo
+            </span>
+          )}
         </div>
 
+        {/* Footer: Precio y Botón + */}
         <div className="flex justify-between items-end mt-2">
-          <span className={`text-lg md:text-xl font-bold tracking-tight ${theme.accentColor}`}>
-            ${item.price.toFixed(2)}
-          </span>
-          
-          {/* Botón visual "+" */}
+          <div className="flex flex-col">
+             <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Precio</span>
+             <span className={`text-xl md:text-2xl font-bold tracking-tight ${theme.accentColor}`}>
+               ${item.price.toFixed(2)}
+             </span>
+          </div>
+
+          {/* Botón visual pequeño */}
           <div className={`
             w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-gray-400
-            group-hover:bg-white group-hover:text-black transition-colors duration-300 shadow-sm
+            group-hover:bg-white group-hover:text-black transition-all duration-300 shadow-md
           `}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
           </div>
         </div>
       </div>
+
+      {/* 2. CAPA DECORATIVA (Icono Degradado Fondo) - Z-Index inferior */}
+      {/* Usamos bg-clip-text con text-transparent para que el gradiente se aplique a la FORMA del icono.
+          Lo rotamos y lo posicionamos "saliéndose" de la tarjeta para efecto artístico.
+      */}
+      <div className={`
+        absolute -bottom-6 -right-6 
+        text-9xl md:text-[8rem] 
+        opacity-[0.15] group-hover:opacity-25 transition-opacity duration-500
+        transform -rotate-12
+        pointer-events-none z-0
+      `}>
+         {/* Envolvemos el icono en un span con gradiente de texto */}
+         <span className={`bg-gradient-to-br ${theme.gradient} bg-clip-text text-transparent`}>
+            {theme.icon}
+         </span>
+      </div>
+      
+      {/* Sutil gradiente oscuro en el fondo para legibilidad del texto */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent opacity-60 pointer-events-none z-0"/>
     </button>
   );
 };
