@@ -18,8 +18,10 @@ import { OrderTypeModal } from './OrderTypeModal';
 import { ProductGrid } from './ProductGrid';
 
 // --- SUB-COMPONENTE LOCAL: Botón de Categoría ---
+// --- SUB-COMPONENTE LOCAL: Botón de Categoría ---
 const CategoryButton = ({ id, name, isActive, onClick }: { id: string, name: string, isActive: boolean, onClick: () => void }) => {
   const theme = CategoryThemeFactory.getTheme(name || id);
+  const IconComponent = theme.icon;
   
   return (
     <button
@@ -27,12 +29,12 @@ const CategoryButton = ({ id, name, isActive, onClick }: { id: string, name: str
       className={`
         group flex flex-col items-center justify-center gap-1 md:gap-2 p-2 rounded-2xl transition-all duration-300 w-full aspect-square relative
         ${isActive 
-          ? `bg-gradient-to-br ${theme.gradient} text-white shadow-lg ${theme.shadowColor} scale-100 ring-2 ring-offset-2 ring-offset-[#161616] ring-transparent` 
+          ? `bg-gradient-to-br ${theme.gradient} text-white shadow-lg scale-100 ring-2 ring-offset-2 ring-offset-[#161616] ring-transparent` 
           : 'bg-[#1E1E1E] text-gray-500 hover:bg-[#252525] hover:text-gray-200'}
       `}
     >
       <div className={`text-xl md:text-2xl transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-        {theme.icon}
+        <IconComponent size={24} />
       </div>
       <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-center leading-tight truncate w-full px-1">
         {name}
@@ -175,7 +177,10 @@ export const POSPage = () => {
           className="mb-6 md:mb-8 p-2 md:p-3 rounded-2xl bg-gradient-to-br from-[#FF5722] to-[#D84315] shadow-lg shadow-orange-900/30 transform hover:scale-105 transition-transform cursor-pointer"
           onClick={() => setSelectedCategoryId('all')}
         >
-           {CategoryThemeFactory.getTheme('all').icon}
+           {(() => {
+              const HomeIcon = CategoryThemeFactory.getTheme('all').icon;
+              return <HomeIcon size={24} className="text-white" />;
+           })()}
         </div>
 
         <div className="flex flex-col gap-3 md:gap-4 w-full px-2 md:px-3 pb-6">

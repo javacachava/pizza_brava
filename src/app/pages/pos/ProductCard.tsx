@@ -2,6 +2,7 @@ import React from 'react';
 import type { MenuItem } from '../../../models/MenuItem';
 import type { ComboDefinition } from '../../../models/ComboDefinition';
 import { CategoryThemeFactory } from '../../../utils/CategoryThemeFactory';
+import { Plus } from 'lucide-react';
 
 interface Props {
   item: MenuItem | ComboDefinition;
@@ -12,92 +13,89 @@ interface Props {
 export const ProductCard: React.FC<Props> = ({ item, type, onClick }) => {
   const isCombo = type === 'COMBO';
   
-  // Obtenemos el tema dinámico
+  // Obtenemos el tema
   const categoryKey = isCombo ? 'combos' : (item as MenuItem).categoryId || 'all';
   const theme = CategoryThemeFactory.getTheme(String(categoryKey));
+  
+  // Extraemos el componente Icono del tema para renderizarlo como componente
+  const IconComponent = theme.icon;
 
   return (
     <button 
       onClick={onClick}
       className={`
-        group relative w-full h-36 md:h-40 flex flex-col text-left
-        /* FONDO: Usamos un gris muy oscuro pero con un toque de transparencia para el efecto glass */
-        bg-[#1E1E1E]/95 backdrop-blur-sm
-        rounded-2xl border border-[#333] overflow-hidden
-        transition-all duration-500 ease-out
-        /* HOVER: Elevación, borde de color y sombra coloreada sutil (Glow) */
-        hover:-translate-y-1 hover:border-[color:var(--accent)] hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]
-        active:scale-[0.97] active:translate-y-0
+        group relative w-full h-40 md:h-44 flex flex-col justify-between
+        bg-gradient-to-br from-[#1E1E1E] to-black
+        rounded-2xl border border-white/10 
+        p-5 overflow-hidden transition-all duration-300
+        hover:border-opacity-50 hover:shadow-2xl hover:-translate-y-1
+        active:scale-[0.98]
       `}
-      // Variables CSS locales para usar el color del tema en los efectos
-      style={{ 
-        '--accent': isCombo ? '#FF5722' : theme.accentColor.replace('text-', ''), // Hack simple para extraer color o usar el naranja por defecto
-        '--shadow-color': theme.shadowColor 
-      } as React.CSSProperties}
+      // Aplicamos el color del borde dinámico en hover
+      style={{ borderColor: 'rgba(255,255,255,0.1)' }} 
     >
+      {/* 1. ÍCONO DECORATIVO (Top Right) */}
+      <IconComponent
+        strokeWidth={1.5}
+        className={`
+          absolute top-4 right-4
+          w-16 h-16
+          opacity-20 group-hover:opacity-30 transition-opacity duration-500
+          /* Truco para gradiente en SVG: en Lucide a veces es mejor usar color directo 
+             o envolver en un div con mask, pero bg-clip-text funciona en texto/fuentes. 
+             Para SVG Lucide, usaremos el color del texto del tema. */
+          ${theme.textColor}
+        `}
+      />
       
-      {/* 1. EFECTO DESTELLO (SHINE) al Hover */}
-      <div className="absolute inset-0 z-20 overflow-hidden rounded-2xl pointer-events-none">
-        <div className="absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-0 group-hover:animate-shine" />
+      {/* Opción B: Si quieres GRADIENTE REAL en el ícono SVG (avanzado):
+          Envolvemos en un div y usamos mix-blend-overlay o similar, 
+          pero para simplicidad y consistencia, el color sólido del tema (ej. Sky-400) 
+          con baja opacidad se ve muy elegante y "neon".
+      */}
+
+      {/* 2. CONTENIDO SUPERIOR (Nombre) */}
+      <div className="z-10 w-full pr-12 text-left">
+        <h3 className="text-white text-lg font-bold leading-tight line-clamp-2 group-hover:text-white/90">
+          {item.name}
+        </h3>
+        {isCombo && (
+          <span className="inline-block mt-1 text-[10px] font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded">
+            COMBO
+          </span>
+        )}
       </div>
 
-      {/* 2. CAPA DE CONTENIDO (Texto y Precio) */}
-      <div className="relative z-10 p-4 flex flex-col justify-between h-full w-full">
-        
-        {/* Header */}
-        <div className="flex justify-between items-start gap-2">
-          <h3 className="text-gray-100 font-bold text-sm md:text-base leading-tight line-clamp-2 pr-4 group-hover:text-white transition-colors drop-shadow-md">
-            {item.name}
-          </h3>
-          {isCombo && (
-            <span className="flex-shrink-0 bg-gradient-to-r from-orange-500 to-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-lg tracking-wider transform group-hover:scale-110 transition-transform">
-              COMBO
-            </span>
-          )}
-        </div>
+      {/* 3. FOOTER (Precio y Botón) */}
+      <div className="z-10 w-full">
+        <p className="text-[10px] tracking-widest text-gray-500 font-bold mb-0.5 text-left uppercase">
+          Precio
+        </p>
 
-        {/* Footer */}
-        <div className="flex justify-between items-end mt-2">
-          <div className="flex flex-col">
-             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest group-hover:text-gray-400 transition-colors">Precio</span>
-             {/* Precio con un efecto de "Resplandor" sutil en el texto */}
-             <span className={`text-xl md:text-2xl font-black tracking-tight ${theme.accentColor} drop-shadow-lg`}>
-               ${item.price.toFixed(2)}
-             </span>
-          </div>
+        <div className="flex items-center justify-between">
+          {/* Precio con el color de la categoría (ej. Azul para bebidas) */}
+          <span className={`text-2xl font-bold tracking-tight ${theme.textColor}`}>
+            ${item.price.toFixed(2)}
+          </span>
 
-          {/* Botón "+" que cambia de color y rota */}
-          <div className={`
-            w-9 h-9 rounded-full bg-[#252525] border border-[#333] flex items-center justify-center 
-            text-gray-400 shadow-lg
-            group-hover:bg-white group-hover:text-black group-hover:border-white group-hover:rotate-90
+          {/* Botón + (Siempre Naranja Sólido) */}
+          <div className="
+            w-10 h-10
+            rounded-full
+            bg-[#FF5722]
+            text-white
+            flex items-center justify-center
+            shadow-lg shadow-orange-900/40
+            group-hover:bg-[#FF7043] group-hover:scale-110 group-active:scale-90
             transition-all duration-300
-          `}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-            </svg>
+          ">
+            <Plus size={20} strokeWidth={3} />
           </div>
         </div>
       </div>
-
-      {/* 3. ICONO DE FONDO (Marca de Agua Animada) */}
-      <div className={`
-        absolute -bottom-4 -right-4 
-        text-8xl md:text-[7rem] 
-        opacity-[0.08] group-hover:opacity-[0.15] 
-        /* ANIMACIÓN 3D: Rota y escala al hacer hover */
-        transform -rotate-12 scale-100 group-hover:scale-125 group-hover:-rotate-6 group-hover:translate-x-2 group-hover:translate-y-2
-        transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)
-        pointer-events-none z-0 filter blur-[1px] group-hover:blur-0
-      `}>
-         {/* Aplicamos el gradiente al icono mismo */}
-         <span className={`bg-gradient-to-br ${theme.gradient} bg-clip-text text-transparent`}>
-            {theme.icon}
-         </span>
-      </div>
       
-      {/* Gradiente sutil inferior para mejorar lectura del precio */}
-      <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none z-0" />
+      {/* Efecto de Brillo Sutil en Hover */}
+      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
     </button>
   );
 };

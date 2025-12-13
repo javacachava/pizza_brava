@@ -1,95 +1,94 @@
 import React from 'react';
-// Iconos de React Icons (Material Design y FontAwesome 6)
-import { MdLocalPizza, MdLunchDining, MdLocalBar, MdIcecream, MdRestaurantMenu, MdFastfood } from 'react-icons/md';
-import { FaBurger, FaBowlFood, FaWineGlass } from 'react-icons/fa6';
-import { BiSolidDish } from 'react-icons/bi';
+import { 
+  Pizza, 
+  CupSoda, 
+  Wine, 
+  IceCream, 
+  UtensilsCrossed, 
+  Sandwich, 
+  Package,
+  Soup
+} from 'lucide-react';
 
-// Interfaz para el tema
 export interface CategoryTheme {
-  icon: React.ReactElement;
-  gradient: string; // Clases de Tailwind para el fondo
-  accentColor: string; // Color de texto/borde
-  shadowColor: string; // Color de sombra
+  icon: React.ElementType; // Cambiamos a ElementType para pasar el componente Lucide
+  gradient: string; // Gradiente para el ícono (bg-gradient-to-br ...)
+  textColor: string; // Color del precio (text-sky-400, etc.)
+  borderColor: string; // Borde sutil (opcional)
 }
 
-// Configuración por defecto
 const DEFAULT_THEME: CategoryTheme = {
-  icon: <MdFastfood />,
-  gradient: 'from-gray-700 to-gray-900',
-  accentColor: 'text-gray-400',
-  shadowColor: 'shadow-gray-900/50'
+  icon: UtensilsCrossed,
+  gradient: 'from-gray-400 to-gray-600',
+  textColor: 'text-gray-400',
+  borderColor: 'border-gray-800'
 };
 
-// Mapa de configuraciones (Extensible)
 const THEME_MAP: Record<string, CategoryTheme> = {
   'pizzas': {
-    icon: <MdLocalPizza />,
-    gradient: 'from-orange-500 to-red-600',
-    accentColor: 'text-orange-500',
-    shadowColor: 'shadow-orange-500/40'
+    icon: Pizza,
+    gradient: 'from-orange-400 to-red-500',
+    textColor: 'text-orange-500',
+    borderColor: 'border-orange-500/20'
   },
   'bebidas': {
-    icon: <MdLocalBar />,
-    gradient: 'from-blue-400 to-indigo-600',
-    accentColor: 'text-blue-400',
-    shadowColor: 'shadow-blue-500/40'
+    icon: CupSoda,
+    gradient: 'from-sky-400 to-cyan-300',
+    textColor: 'text-sky-400',
+    borderColor: 'border-sky-500/20'
   },
   'drinks': {
-    icon: <FaWineGlass />,
-    gradient: 'from-purple-500 to-pink-600',
-    accentColor: 'text-purple-400',
-    shadowColor: 'shadow-purple-500/40'
-  },
-  'hamburguesas': {
-    icon: <FaBurger />,
-    gradient: 'from-yellow-500 to-orange-600',
-    accentColor: 'text-yellow-500',
-    shadowColor: 'shadow-yellow-500/40'
+    icon: Wine,
+    gradient: 'from-purple-400 to-fuchsia-500',
+    textColor: 'text-fuchsia-400',
+    borderColor: 'border-fuchsia-500/20'
   },
   'combos': {
-    icon: <MdLunchDining />,
-    gradient: 'from-emerald-400 to-green-600',
-    accentColor: 'text-emerald-400',
-    shadowColor: 'shadow-emerald-500/40'
+    icon: Package, // O Utensils
+    gradient: 'from-emerald-400 to-green-500',
+    textColor: 'text-emerald-400',
+    borderColor: 'border-emerald-500/20'
   },
   'postres': {
-    icon: <MdIcecream />,
-    gradient: 'from-pink-400 to-rose-500',
-    accentColor: 'text-pink-400',
-    shadowColor: 'shadow-pink-500/40'
+    icon: IceCream,
+    gradient: 'from-pink-400 to-rose-400',
+    textColor: 'text-pink-400',
+    borderColor: 'border-pink-500/20'
   },
   'frozens': {
-    icon: <MdIcecream />,
-    gradient: 'from-cyan-400 to-blue-500',
-    accentColor: 'text-cyan-400',
-    shadowColor: 'shadow-cyan-500/40'
+    icon: IceCream, // O Snowflake si prefieres
+    gradient: 'from-cyan-300 to-blue-400',
+    textColor: 'text-cyan-300',
+    borderColor: 'border-cyan-500/20'
   },
   'entradas': {
-    icon: <FaBowlFood />,
-    gradient: 'from-amber-600 to-orange-700',
-    accentColor: 'text-amber-500',
-    shadowColor: 'shadow-amber-500/40'
+    icon: Soup, // O Sandwich
+    gradient: 'from-amber-400 to-yellow-500',
+    textColor: 'text-amber-400',
+    borderColor: 'border-amber-500/20'
+  },
+  'hamburguesas': {
+    icon: Sandwich,
+    gradient: 'from-yellow-400 to-orange-500',
+    textColor: 'text-yellow-400',
+    borderColor: 'border-yellow-500/20'
   },
   'all': {
-    icon: <MdRestaurantMenu />,
-    gradient: 'from-[#FF5722] to-[#D84315]', // Tu naranja corporativo
-    accentColor: 'text-[#FF5722]',
-    shadowColor: 'shadow-[#FF5722]/40'
+    icon: UtensilsCrossed,
+    gradient: 'from-orange-500 to-red-500',
+    textColor: 'text-white',
+    borderColor: 'border-white/10'
   }
 };
 
 export class CategoryThemeFactory {
-  /**
-   * Obtiene el tema visual basado en el nombre o ID de la categoría.
-   * Utiliza búsqueda parcial (includes) para mayor flexibilidad.
-   */
   static getTheme(categoryNameOrId: string): CategoryTheme {
-    const key = categoryNameOrId.toLowerCase();
+    const key = (categoryNameOrId || '').toLowerCase();
     
-    // 1. Búsqueda exacta
+    // Búsqueda exacta
     if (THEME_MAP[key]) return THEME_MAP[key];
 
-    // 2. Búsqueda por coincidencia de texto (ej: "Bebidas Calientes" -> match "bebidas")
+    // Búsqueda parcial
     const foundKey = Object.keys(THEME_MAP).find(k => key.includes(k));
     
     return foundKey ? THEME_MAP[foundKey] : DEFAULT_THEME;
