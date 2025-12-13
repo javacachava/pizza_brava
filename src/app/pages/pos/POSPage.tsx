@@ -265,7 +265,9 @@ export const POSPage = () => {
         isLoading={isSubmitting}
         tables={tables}
         onConfirm={(type, meta) => {
-          commands.submitOrder(type, meta).then(() => {
+          // Mapeo de UI Type ('comer_aqui') a Domain Type ('mesa')
+          const domainType = type === 'comer_aqui' ? 'mesa' : type;
+          commands.submitOrder(domainType, meta).then(() => {
              if(cart.length === 0) setIsProcessModalOpen(false);
           });
         }}
