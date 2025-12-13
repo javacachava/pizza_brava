@@ -1,7 +1,7 @@
 import React from 'react';
 import type { MenuItem } from '../../../models/MenuItem';
 import type { ComboDefinition } from '../../../models/ComboDefinition';
-// import { ProductCard } from './ProductCard'; // Opcional, o lo definimos inline si queremos mantener el estilo previo
+import { ProductCard } from './ProductCard';
 
 interface Props {
   products: MenuItem[];
@@ -16,53 +16,44 @@ export const ProductGrid: React.FC<Props> = ({
   onProductClick, 
   onComboClick 
 }) => {
+  
+  const hasItems = products.length > 0 || combos.length > 0;
+
+  if (!hasItems) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50">
+        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+        <p className="text-lg font-medium">No hay productos en esta categoría</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 pb-20">
       
-      {/* SECCIÓN COMBOS */}
-      {combos.map((c) => (
-        <button
-          key={c.id}
-          onClick={() => onComboClick(c)}
-          className="group bg-[#1E1E1E] rounded-2xl border border-[#333] hover:border-[#FF5722] transition-all duration-300 overflow-hidden text-left flex flex-col h-64"
-        >
-          <div className="h-40 bg-[#252525] relative flex items-center justify-center text-5xl">
-            🎁
-          </div>
-          <div className="p-4 flex-1 flex flex-col">
-            <h3 className="font-bold text-gray-100 mb-1">{c.name}</h3>
-            <span className="text-xl font-bold text-[#FF5722]">${c.price.toFixed(2)}</span>
-          </div>
-        </button>
+      {/* 1. Renderizamos Combos primero (Prioridad visual) */}
+      {combos.map((combo) => (
+        <ProductCard
+          key={`combo-${combo.id}`}
+          item={combo}
+          type="COMBO"
+          onClick={() => onComboClick(combo)}
+        />
       ))}
 
-      {/* SECCIÓN PRODUCTOS */}
-      {products.map((p) => (
-        <button 
-          key={p.id}
-          onClick={() => onProductClick(p)}
-          className="group bg-[#1E1E1E] rounded-2xl border border-[#333] hover:border-[#FF5722] hover:shadow-xl hover:shadow-orange-900/10 transition-all duration-300 overflow-hidden text-left flex flex-col h-64"
-        >
-          <div className="h-40 bg-[#252525] relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#1E1E1E] to-transparent opacity-60 z-10"/>
-            <div className="w-full h-full flex items-center justify-center text-5xl group-hover:scale-110 transition-transform duration-500 text-gray-700">
-              🍔
-            </div>
-          </div>
-          <div className="p-4 flex-1 flex flex-col">
-            <h3 className="font-bold text-gray-100 text-lg leading-tight mb-1 group-hover:text-[#FF5722] transition-colors">{p.name}</h3>
-            <div className="mt-auto flex justify-between items-center">
-              <span className="text-xl font-bold text-white">${p.price.toFixed(2)}</span>
-              <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-[#FF5722] group-hover:bg-[#FF5722] group-hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              </div>
-            </div>
-          </div>
-        </button>
+      {/* 2. Renderizamos Productos individuales */}
+      {products.map((product) => (
+        <ProductCard
+          key={`prod-${product.id}`}
+          item={product}
+          type="PRODUCT"
+          onClick={() => onProductClick(product)}
+        />
       ))}
     </div>
   );
 };
 
-// Exportamos por defecto y también como nombre (por si acaso importación es named)
 export default ProductGrid;
