@@ -1,12 +1,12 @@
 import React from 'react';
 import type { MenuItem } from '../../../models/MenuItem';
 import type { ComboDefinition } from '../../../models/ComboDefinition';
-import { ProductCard } from './ProductCard';
+// import { ProductCard } from './ProductCard'; // Opcional, o lo definimos inline si queremos mantener el estilo previo
 
 interface Props {
   products: MenuItem[];
   combos: ComboDefinition[];
-  onProductClick: (product: MenuItem) => void;
+  onProductClick: (item: MenuItem) => void;
   onComboClick: (combo: ComboDefinition) => void;
 }
 
@@ -16,61 +16,53 @@ export const ProductGrid: React.FC<Props> = ({
   onProductClick, 
   onComboClick 
 }) => {
-  // Lógica de visualización limpia:
-  // Si hay combos, mostramos solo la sección de combos (asumiendo que estamos en la categoría Combos)
-  // Si hay productos, mostramos productos.
-  
-  if (combos.length === 0 && products.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-        <p>No se encontraron elementos.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="pb-20">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6">
       
-      {/* SECCIÓN DE COMBOS (Solo se renderiza si hay combos en la lista filtrada) */}
-      {combos.length > 0 && (
-        <div className="mb-8">
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
-            {combos.map(combo => (
-              <ProductCard
-                key={`combo-${combo.id}`}
-                product={{
-                  id: combo.id,
-                  name: combo.name,
-                  description: combo.description,
-                  price: combo.price,
-                  categoryId: 'combos',
-                  isAvailable: combo.isAvailable,
-                  usesIngredients: false,
-                  usesFlavors: false,
-                  usesSizeVariant: false,
-                  comboEligible: false
-                } as MenuItem}
-                onClick={() => onComboClick(combo)}
-              />
-            ))}
+      {/* SECCIÓN COMBOS */}
+      {combos.map((c) => (
+        <button
+          key={c.id}
+          onClick={() => onComboClick(c)}
+          className="group bg-[#1E1E1E] rounded-2xl border border-[#333] hover:border-[#FF5722] transition-all duration-300 overflow-hidden text-left flex flex-col h-64"
+        >
+          <div className="h-40 bg-[#252525] relative flex items-center justify-center text-5xl">
+            🎁
           </div>
-        </div>
-      )}
+          <div className="p-4 flex-1 flex flex-col">
+            <h3 className="font-bold text-gray-100 mb-1">{c.name}</h3>
+            <span className="text-xl font-bold text-[#FF5722]">${c.price.toFixed(2)}</span>
+          </div>
+        </button>
+      ))}
 
-      {/* SECCIÓN DE PRODUCTOS */}
-      {products.length > 0 && (
-        <div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
-            {products.map(p => (
-              <ProductCard 
-                key={p.id} 
-                product={p} 
-                onClick={() => onProductClick(p)} 
-              />
-            ))}
+      {/* SECCIÓN PRODUCTOS */}
+      {products.map((p) => (
+        <button 
+          key={p.id}
+          onClick={() => onProductClick(p)}
+          className="group bg-[#1E1E1E] rounded-2xl border border-[#333] hover:border-[#FF5722] hover:shadow-xl hover:shadow-orange-900/10 transition-all duration-300 overflow-hidden text-left flex flex-col h-64"
+        >
+          <div className="h-40 bg-[#252525] relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1E1E1E] to-transparent opacity-60 z-10"/>
+            <div className="w-full h-full flex items-center justify-center text-5xl group-hover:scale-110 transition-transform duration-500 text-gray-700">
+              🍔
+            </div>
           </div>
-        </div>
-      )}
+          <div className="p-4 flex-1 flex flex-col">
+            <h3 className="font-bold text-gray-100 text-lg leading-tight mb-1 group-hover:text-[#FF5722] transition-colors">{p.name}</h3>
+            <div className="mt-auto flex justify-between items-center">
+              <span className="text-xl font-bold text-white">${p.price.toFixed(2)}</span>
+              <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-[#FF5722] group-hover:bg-[#FF5722] group-hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </div>
+            </div>
+          </div>
+        </button>
+      ))}
     </div>
   );
 };
+
+// Exportamos por defecto y también como nombre (por si acaso importación es named)
+export default ProductGrid;
